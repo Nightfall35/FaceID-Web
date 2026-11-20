@@ -50,9 +50,12 @@ def test_enroll_and_identify(client):
              ("files", ("sw.jpg", img("Serena_Williams", 10), "image/jpeg")),
              ("files", ("unk.jpg", img("Tony_Blair", 1), "image/jpeg"))]
     r = client.post("/api/identify", files=files).json()
-    names = [res["faces"][0]["name"] for res in r["results"]]
-    assert names == ["Colin_Powell", "Serena_Williams", "Unknown"]
-    assert r["results"][0]["faces"][0]["confidence"] > 0.8
+    labels = [{f["name"] for f in res["faces"]} for res in r["results"]]
+    assert "Colin_Powell" in labels[0] and "Serena_Williams" not in labels[0]
+    assert "Serena_Williams" in labels[1] and "Colin_Powell" not in labels[1]
+    assert labels[2] == {"Unknown"}  # Tony Blair is not enrolled
+    cp = next(f for f in r["results"][0]["faces"] if f["known"])
+    assert cp["confidence"] > 0.8 and cp["score"] > 0.45
 
 
 def test_rejects_bad_enrollment_photos(client):
@@ -88,4 +91,24 @@ def test_threshold_setting_and_delete(client):
     assert client.post("/api/wipe", data={"confirm": "nah"}).status_code == 400
     assert client.post("/api/wipe", data={"confirm": "DELETE"}).status_code == 200
     s = client.get("/api/settings").json()
-    assert s["people"] == 0 and s["photos"] == 0 and s["threshold"] == 0.4
+    assert s["people"] == 0 and s["photos"] == 0 and s["threshold"] == 0.45
+
+
+def test_duplicate_enrollment_rejected(client):
+    pid = client.post("/api/people", data={"name": "Dup Test"}).json()["id"]
+    f = [("files", ("a.jpg", img("Serena_Williams", 5), "image/jpeg"))]
+    assert client.post(f"/api/people/{pid}/photos", files=f).json()["results"][0]["accepted"]
+    r = client.post(f"/api/people/{pid}/photos", files=f).json()["results"][0]
+    assert not r["accepted"] and "duplicate" in r["errors"][0].lower()
+
+
+def test_landmark_checks():
+    from app.face_engine import Face
+    from app.main import landmark_problems
+    bbox = np.array([0, 0, 100, 120], np.float32)
+    frontal = np.array([[30, 45], [70, 45], [50, 65], [35, 90], [65, 90]], np.float32)
+    assert landmark_problems(Face(bbox, frontal, 0.9)) == []
+    profile = np.array([[60, 45], [72, 45], [90, 65], [62, 90], [72, 90]], np.float32)
+    assert landmark_problems(Face(bbox, profile, 0.9))
+    outside = frontal.copy(); outside[2] = [300, 300]
+    assert "outside" in landmark_problems(Face(bbox, outside, 0.9))[0]

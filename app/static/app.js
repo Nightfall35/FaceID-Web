@@ -27,7 +27,7 @@ function show(view) {
 $$('.tab').forEach((t) => t.addEventListener('click', () => show(t.dataset.view)));
 
 // ---------- threshold ----------
-let threshold = 0.4, defaultThreshold = 0.4;
+let threshold = 0.45, defaultThreshold = 0.45, margin = 0.05, defaultMargin = 0.05;
 function setThr(v) {
   threshold = +(+v).toFixed(2);
   $('#thr').value = threshold; $('#thr-val').textContent = threshold.toFixed(2);
@@ -39,10 +39,12 @@ $('#thr').addEventListener('input', (e) => {
   clearTimeout(rerunTimer); rerunTimer = setTimeout(() => lastFiles.length && runIdentify(lastFiles), 350);
 });
 $('#thr2').addEventListener('input', (e) => setThr(e.target.value));
+function setMargin(v) { margin = +(+v).toFixed(2); $('#margin').value = margin; $('#margin-val').textContent = margin.toFixed(2); }
+$('#margin').addEventListener('input', (e) => setMargin(e.target.value));
 $('#save-thr').addEventListener('click', async () => {
-  await api('/api/settings', { method: 'POST', body: form({ threshold }) }); toast('Default threshold saved');
+  await api('/api/settings', { method: 'POST', body: form({ threshold, margin }) }); toast('Defaults saved');
 });
-$('#reset-thr').addEventListener('click', () => setThr(defaultThreshold));
+$('#reset-thr').addEventListener('click', () => { setThr(defaultThreshold); setMargin(defaultMargin); });
 
 // ---------- identify ----------
 let lastFiles = [];
@@ -63,7 +65,7 @@ const COLORS = { known: '#2fd18b', unknown: '#ff5d6c', ambiguous: '#ffb547' };
 async function runIdentify(files) {
   const st = $('#id-status');
   st.innerHTML = `<span class="spinner"></span>Analyzing ${files.length} photo${files.length > 1 ? 's' : ''}…`;
-  const fd = new FormData(); files.forEach((f) => fd.append('files', f)); fd.append('threshold', threshold);
+  const fd = new FormData(); files.forEach((f) => fd.append('files', f)); fd.append('threshold', threshold); fd.append('margin', margin);
   let data;
   try { data = await api('/api/identify', { method: 'POST', body: fd }); }
   catch (e) { st.textContent = 'Error: ' + e.message; return; }
@@ -84,13 +86,14 @@ async function runIdentify(files) {
     right.innerHTML = `<h3>${esc(r.filename)}</h3><div class="muted small">${r.faces.length} face(s) · ${r.ms} ms</div>`;
     const ul = document.createElement('ul'); ul.className = 'face-list';
     r.faces.forEach((f, i) => {
-      const li = document.createElement('li'); li.className = 'face-item' + (f.known ? '' : ' unknown');
+      const li = document.createElement('li'); li.className = 'face-item' + (f.known ? '' : f.ambiguous ? ' ambiguous' : ' unknown');
       const th = document.createElement('canvas'); cropFace(th, img, r, f.bbox);
       const pct = Math.round(f.confidence * 100);
       li.appendChild(th);
       const info = document.createElement('div');
-      info.innerHTML = `<div><span class="nm">#${i + 1} ${esc(f.name)}</span>${f.ambiguous ? `<span class="pill warn">close to ${esc(f.runner_up)}</span>` : ''}</div>
-        <div class="muted small">${f.known ? `confidence ${pct}%` : `unknown (${pct}% sure)`} · similarity ${f.score.toFixed(3)}${!f.known && f.runner_up ? ` · closest: ${esc(f.runner_up)}` : ''}</div>
+      const sub = f.known ? `confidence ${pct}%` : f.ambiguous ? 'too close to call' : `unknown (${pct}% sure)`;
+      info.innerHTML = `<div><span class="nm">#${i + 1} ${esc(f.ambiguous ? 'Ambiguous' : f.name)}</span>${f.ambiguous ? `<span class="pill warn">${esc(f.runner_up)}?</span>` : ''}</div>
+        <div class="muted small">${sub} · similarity ${f.score.toFixed(3)}${!f.known && !f.ambiguous && f.runner_up ? ` · closest: ${esc(f.runner_up)}` : ''}</div>
         <div class="bar"><i style="width:${pct}%"></i></div>`;
       li.appendChild(info); ul.appendChild(li);
     });
@@ -107,9 +110,9 @@ function drawResult(cv, img, r) {
   const lw = Math.max(2, Math.round(cv.width / 300)), fs = Math.max(13, Math.round(cv.width / 45));
   r.faces.forEach((f, i) => {
     const [x1, y1, x2, y2] = f.bbox.map((v) => v * scale);
-    const col = f.known ? (f.ambiguous ? COLORS.ambiguous : COLORS.known) : COLORS.unknown;
+    const col = f.known ? COLORS.known : (f.ambiguous ? COLORS.ambiguous : COLORS.unknown);
     ctx.lineWidth = lw; ctx.strokeStyle = col; ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-    const label = `${i + 1}. ${f.name}${f.known ? ' ' + Math.round(f.confidence * 100) + '%' : ''}`;
+    const label = `${i + 1}. ${f.ambiguous ? '? ' + f.runner_up : f.name}${f.known ? ' ' + Math.round(f.confidence * 100) + '%' : ''}`;
     ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`;
     const tw = ctx.measureText(label).width + fs * 0.8, th = fs * 1.5;
     let ly = y1 - th; if (ly < 0) ly = y2;
@@ -186,6 +189,7 @@ function personCard(p) {
 async function loadSettings() {
   const s = await api('/api/settings');
   defaultThreshold = s.default_threshold; $('#def-thr').textContent = s.default_threshold.toFixed(2);
+  defaultMargin = s.default_margin; $('#def-margin').textContent = s.default_margin.toFixed(2);
   $('#stats').textContent = `${s.people} people · ${s.photos} reference photos · password protection ${s.password_protected ? 'on' : 'OFF (set FACEID_PASSWORD)'}`;
   $('#logout').hidden = !s.password_protected;
   return s;
@@ -194,10 +198,10 @@ $('#wipe').addEventListener('click', async () => {
   const c = $('#wipe-confirm').value;
   if (c !== 'DELETE') { toast('Type DELETE to confirm'); return; }
   await api('/api/wipe', { method: 'POST', body: form({ confirm: c }) });
-  $('#wipe-confirm').value = ''; toast('All data deleted'); setThr(defaultThreshold); loadSettings();
+  $('#wipe-confirm').value = ''; toast('All data deleted'); setThr(defaultThreshold); setMargin(defaultMargin); loadSettings();
 });
 $('#logout').addEventListener('click', async () => { await api('/api/logout', { method: 'POST' }); location.href = '/login'; });
 
 // ---------- boot ----------
-loadSettings().then((s) => setThr(s.threshold));
+loadSettings().then((s) => { setThr(s.threshold); setMargin(s.margin); });
 show((location.hash || '#identify').slice(1));

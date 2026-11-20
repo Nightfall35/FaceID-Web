@@ -25,8 +25,8 @@
         <p class="muted">Upload photos. Every face is detected and matched only against people you've enrolled.</p>
       </div>
       <div class="threshold-box">
-        <label for="thr">Match threshold <b id="thr-val">0.40</b></label>
-        <input type="range" id="thr" min="0.2" max="0.7" step="0.01" value="0.40">
+        <label for="thr">Match threshold <b id="thr-val">0.45</b></label>
+        <input type="range" id="thr" min="0.2" max="0.7" step="0.01" value="0.45">
         <div class="hint"><span>more matches</span><span>stricter</span></div>
       </div>
     </div>
@@ -45,7 +45,7 @@
     <div class="view-head">
       <div>
         <h1>Enrolled people</h1>
-        <p class="muted">Only enroll people who have agreed to it. 3–5 clear photos per person (different angles and lighting) gives the best accuracy.</p>
+        <p class="muted">Only enroll people who have agreed to it. Add 3+ clear, varied photos per person (front and slight angles, different lighting, with/without glasses) for the best accuracy.</p>
       </div>
       <form id="new-person" class="inline-form">
         <input name="name" placeholder="New person's name" required maxlength="100">
@@ -61,10 +61,18 @@
     <h1>Settings</h1>
     <div class="card settings-card">
       <h2>Recognition threshold</h2>
-      <p class="muted">Cosine-similarity score a face needs to be labeled as an enrolled person. Lower = more matches but more risk of false matches; higher = stricter. Default <b id="def-thr">0.40</b>.</p>
+      <p class="muted">Cosine-similarity score a face needs to be labeled as an enrolled person. Lower = more matches but more risk of false matches; higher = stricter. Default <b id="def-thr">0.45</b>.</p>
       <div class="row">
         <input type="range" id="thr2" min="0.2" max="0.7" step="0.01">
         <b id="thr2-val"></b>
+      </div>
+      <h2 style="margin-top:16px">Ambiguity margin</h2>
+      <p class="muted">If the best and second-best enrolled people score within this gap, the face is left unlabeled (shown as "Ambiguous") instead of guessing. Default <b id="def-margin">0.05</b>; 0 disables.</p>
+      <div class="row">
+        <input type="range" id="margin" min="0" max="0.2" step="0.01">
+        <b id="margin-val"></b>
+      </div>
+      <div class="row" style="margin-top:14px">
         <button class="btn" id="save-thr">Save as default</button>
         <button class="btn ghost" id="reset-thr">Reset</button>
       </div>

@@ -47,7 +47,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .dropzone:hover, .dropzone.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
 .dz-icon { font-size: 30px; color: var(--accent); }
 .status { margin: 14px 0; color: var(--muted); min-height: 1.5em; }
-.result { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 18px; padding: 16px; margin-bottom: 18px; }
+.result { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 18px; align-items: start; padding: 16px; margin-bottom: 18px; }
 .result .canvas-wrap { position: relative; background: #000; border-radius: 10px; overflow: hidden; }
 .result canvas { width: 100%; height: auto; display: block; }
 .result h3 { margin-bottom: 4px; word-break: break-all; }
@@ -59,6 +59,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .face-item .bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; margin-top: 4px; width: 140px; }
 .face-item .bar > i { display: block; height: 100%; background: var(--ok); }
 .face-item.unknown .bar > i { background: var(--bad); }
+.face-item.ambiguous .nm { color: var(--warn); } .face-item.ambiguous .bar > i { background: var(--warn); }
 .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; margin-left: 6px; }
 .pill.warn { background: color-mix(in srgb, var(--warn) 25%, transparent); color: var(--warn); }
 .people-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }

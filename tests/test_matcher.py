@@ -62,11 +62,22 @@ def test_threshold_controls_acceptance(people):
     assert g.identify(q, threshold=s + 0.01)[0].person_id is None
 
 
-def test_centroid_combined_with_nn(people):
+def test_score_is_max_over_all_embeddings(people):
     g, ids = make_gallery(people, per_person=4)
-    comb, nn, cen = g.person_scores(noisy(people["bob"], 0.03)[None])
+    q = noisy(people["bob"], 0.03)
+    comb, nn, cen = g.person_scores(q[None])
     j = g.person_ids.index(ids["bob"])
-    assert np.isclose(comb[0, j], 0.6 * nn[0, j] + 0.4 * cen[0, j], atol=1e-5)
+    bob_embs = np.stack([e for e, o in zip(g._emb, g._owner) if o == j])
+    assert np.isclose(comb[0, j], (bob_embs @ l2n(q)).max(), atol=1e-5)
+    assert -1 <= cen[0, j] <= 1
+
+
+def test_outlier_photo_still_matches_via_max():
+    """A probe matching only one of a person's varied photos is still found (max, not mean)."""
+    a1, a2, a3 = rand_unit(3)
+    g = Gallery([(1, "alice", a1), (1, "alice", a2), (1, "alice", a3), (2, "bob", rand_unit()[0])])
+    m = g.identify(noisy(a3, 0.03)[None], threshold=0.45)[0]
+    assert m.person_id == 1
 
 
 def test_single_photo_uses_nn_only():
@@ -100,8 +111,10 @@ def test_ambiguity_flag():
     b = l2n(a + 0.02 * rand_unit()[0])  # nearly identical identities
     g = Gallery([(1, "a", a), (2, "b", b)])
     m = g.identify(a[None], threshold=0.4)[0]
-    assert m.person_id == 1
+    assert m.person_id is None  # too close to call -> Unknown
     assert m.ambiguous
+    assert "a" in m.runner_up and "b" in m.runner_up
+    assert g.identify(a[None], threshold=0.4, margin=0.0)[0].person_id == 1
 
 
 def test_empty_gallery():

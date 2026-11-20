@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from .face_engine import FaceEngine, load_image
-from .matcher import DEFAULT_THRESHOLD, Gallery
+from .matcher import DEFAULT_MARGIN, DEFAULT_THRESHOLD, Gallery
 from .storage import Store
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +32,33 @@ MIN_FACE_PX = int(os.environ.get("FACEID_MIN_FACE_PX", "64"))
 MIN_BLUR = float(os.environ.get("FACEID_MIN_BLUR", "25"))
 MIN_DET_SCORE = float(os.environ.get("FACEID_MIN_DET_SCORE", "0.6"))
 WARN_BLUR = 60.0
+DUPLICATE_SIM = 0.97  # an enrollment this close to an existing photo of the person adds nothing
+
+
+def landmark_problems(face) -> list[str]:
+    """Sanity-check the 5 landmarks (eyes, nose, mouth corners) before trusting the alignment."""
+    k = np.asarray(face.kps, np.float32)
+    x1, y1, x2, y2 = face.bbox
+    w, h = x2 - x1, y2 - y1
+    if k.shape != (5, 2) or not np.isfinite(k).all():
+        return ["Facial landmarks could not be found"]
+    pad = 0.15
+    inside = (k[:, 0] >= x1 - pad * w) & (k[:, 0] <= x2 + pad * w) & (k[:, 1] >= y1 - pad * h) & (k[:, 1] <= y2 + pad * h)
+    if not inside.all():
+        return ["Facial landmarks fall outside the face (bad detection)"]
+    le, re_, nose, lm, rm = k
+    eye_d = float(np.linalg.norm(re_ - le))
+    probs = []
+    if eye_d < 0.22 * w or re_[0] <= le[0] or rm[0] <= lm[0]:
+        probs.append("Face is turned too far to the side; use a more frontal photo")
+    else:
+        mid = (le + re_) / 2
+        yaw = abs(float(nose[0] - mid[0])) / eye_d
+        if yaw > 0.45:
+            probs.append(f"Face is turned too far to the side (yaw index {yaw:.2f}); use a more frontal photo")
+        if not (max(le[1], re_[1]) < nose[1] < min(lm[1], rm[1]) + 0.05 * h):
+            probs.append("Face is tilted or partly hidden (landmarks out of order)")
+    return probs
 
 @asynccontextmanager
 async def lifespan(_app):
@@ -68,6 +95,10 @@ def invalidate_gallery():
 
 def current_threshold() -> float:
     return float(store.get_setting("threshold", DEFAULT_THRESHOLD))
+
+
+def current_margin() -> float:
+    return float(store.get_setting("margin", DEFAULT_MARGIN))
 
 
 # ---------------- auth ----------------
@@ -217,6 +248,7 @@ def assess_enrollment(faces, img_shape) -> tuple[object | None, list[str], list[
         warnings.append(f"Photo is a little soft (sharpness {q['blur']:.0f}); a sharper photo improves accuracy")
     if face.det_score < MIN_DET_SCORE:
         errors.append(f"Face not clearly visible (detector confidence {face.det_score:.2f})")
+    errors.extend(landmark_problems(face))
     return face, errors, warnings
 
 
@@ -241,7 +273,10 @@ async def add_photos(pid: int, files: List[UploadFile] = File(...), force: bool 
             own = store.person_embeddings(pid)
             if len(own):
                 sim_own = float((own @ face.embedding).max())
-                if sim_own < 0.25:
+                if sim_own >= DUPLICATE_SIM:
+                    errors.append(f"Near-duplicate of a photo already enrolled (similarity {sim_own:.2f}); "
+                                  "add a different photo (other angle/lighting) instead")
+                elif sim_own < 0.25:
                     msg = f"Doesn't look like {person['name']}'s other photos (similarity {sim_own:.2f})"
                     (warnings if force else errors).append(msg + ("" if force else "; tick 'force' to add anyway"))
             g = gallery()
@@ -287,8 +322,9 @@ def get_photo_file(phid: int, kind: str):
 # ---------------- identification ----------------
 @app.post("/api/identify", dependencies=[Depends(require_auth)])
 async def identify(files: List[UploadFile] = File(...), threshold: float | None = Form(None),
-                   unique: bool = Form(True)):
+                   margin: float | None = Form(None), unique: bool = Form(True)):
     thr = current_threshold() if threshold is None else float(threshold)
+    mrg = current_margin() if margin is None else float(margin)
     if not -1.0 <= thr <= 1.0:
         raise HTTPException(400, "threshold must be between -1 and 1")
     g = gallery()
@@ -301,28 +337,36 @@ async def identify(files: List[UploadFile] = File(...), threshold: float | None 
             out.append({"filename": f.filename, "error": getattr(e, "detail", None) or str(e), "faces": []})
             continue
         faces = engine().analyze(img)
-        matches = g.identify(np.stack([fc.embedding for fc in faces]), threshold=thr, unique=unique) if faces else []
+        matches = g.identify(np.stack([fc.embedding for fc in faces]), threshold=thr, unique=unique,
+                                margin=mrg) if faces else []
         out.append({
             "filename": f.filename,
             "width": img.shape[1], "height": img.shape[0],
-            "faces": [{**fc.to_dict(), **m.to_dict()} for fc, m in zip(faces, matches)],
+            # left-to-right order reads naturally in the UI
+            "faces": sorted(({**fc.to_dict(), **m.to_dict()} for fc, m in zip(faces, matches)),
+                            key=lambda d: d["bbox"][0]),
             "ms": int((time.time() - t0) * 1000),
         })
-    return {"threshold": thr, "enrolled_people": len(g), "results": out}
+    return {"threshold": thr, "margin": mrg, "enrolled_people": len(g), "results": out}
 
 
 # ---------------- settings / admin ----------------
 @app.get("/api/settings", dependencies=[Depends(require_auth)])
 def get_settings():
     return {"threshold": current_threshold(), "default_threshold": DEFAULT_THRESHOLD,
+            "margin": current_margin(), "default_margin": DEFAULT_MARGIN,
             "password_protected": bool(PASSWORD), **store.stats()}
 
 
 @app.post("/api/settings", dependencies=[Depends(require_auth)])
-def set_settings(threshold: float = Form(...)):
+def set_settings(threshold: float = Form(...), margin: float | None = Form(None)):
     if not 0.0 <= threshold <= 1.0:
         raise HTTPException(400, "threshold must be between 0 and 1")
     store.set_setting("threshold", threshold)
+    if margin is not None:
+        if not 0.0 <= margin <= 0.3:
+            raise HTTPException(400, "margin must be between 0 and 0.3")
+        store.set_setting("margin", margin)
     return get_settings()
 
 

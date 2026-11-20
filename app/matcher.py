@@ -1,9 +1,14 @@
 """Pure-numpy open-set identification over a gallery of enrolled embeddings.
 
-Scoring per enrolled person combines
-  * nearest neighbour: max cosine similarity to any of their reference photos, and
-  * centroid: cosine similarity to the L2-normalised mean of their embeddings,
-which is more robust than either alone once a person has several photos.
+Every accepted enrollment embedding is kept. A person's score is the *maximum* cosine
+similarity between the probe and any of their reference embeddings (nearest neighbour,
+as recommended by InsightFace's 1:N evaluation guide). The similarity to the person's
+L2-normalised centroid is reported alongside for information.
+
+Open-set decision rule:
+  1. top-1 score < threshold                  -> Unknown
+  2. top-1 - top-2 (other person) < margin    -> Unknown, flagged ambiguous (both candidates shown)
+  3. otherwise                                -> top-1 identity
 """
 from __future__ import annotations
 
@@ -11,8 +16,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-DEFAULT_THRESHOLD = 0.40  # cosine; see README (chosen from LFW / identification eval)
-NN_WEIGHT = 0.6
+DEFAULT_THRESHOLD = 0.45  # cosine; InsightFace SDK default, validated on LFW open-set eval (README)
+DEFAULT_MARGIN = 0.05  # min gap between best and second-best person
 
 
 def l2n(x: np.ndarray) -> np.ndarray:
@@ -92,21 +97,24 @@ class Gallery:
         for j in range(P):
             nn[:, j] = sims[:, self._owner == j].max(axis=1)
         cen = q @ self._centroids.T
-        counts = np.bincount(self._owner, minlength=P)
-        w = np.where(counts > 1, NN_WEIGHT, 1.0)[None, :]
-        combined = w * nn + (1 - w) * cen
-        return combined, nn, cen
+        return nn.copy(), nn, cen
 
     def identify(self, queries: np.ndarray, threshold: float = DEFAULT_THRESHOLD, unique: bool = True,
-                 ambiguity_margin: float = 0.05) -> list[Match]:
+                 margin: float = DEFAULT_MARGIN) -> list[Match]:
         """Identify each query face. If `unique`, a person may be assigned to at most one
-        face per image (greedy best-first assignment), which removes duplicate labels."""
+        face per image (greedy best-first assignment), which removes duplicate labels.
+        A face whose best and second-best people are closer than `margin` is left Unknown
+        (ambiguous) rather than risk a wrong name."""
         q = np.atleast_2d(queries)
         n = q.shape[0]
         if n == 0:
             return []
         combined, nn, cen = self.person_scores(q)
         P = combined.shape[1]
+        ambiguous = np.zeros(n, bool)
+        if P >= 2 and margin > 0:
+            top2 = -np.sort(-combined, axis=1)[:, :2]
+            ambiguous = (top2[:, 0] >= threshold) & (top2[:, 0] - top2[:, 1] < margin)
         assignment: dict[int, int | None] = {i: None for i in range(n)}
         if P:
             if unique:
@@ -115,7 +123,7 @@ class Gallery:
                 for i, j in order:
                     if combined[i, j] < threshold:
                         break
-                    if i in used_faces or j in used_people:
+                    if i in used_faces or j in used_people or ambiguous[i]:
                         continue
                     assignment[int(i)] = int(j)
                     used_faces.add(i)
@@ -123,7 +131,7 @@ class Gallery:
             else:
                 for i in range(n):
                     j = int(np.argmax(combined[i]))
-                    if combined[i, j] >= threshold:
+                    if combined[i, j] >= threshold and not ambiguous[i]:
                         assignment[i] = j
         out = []
         for i in range(n):
@@ -133,10 +141,15 @@ class Gallery:
             if j is None:
                 best = int(ranked[0]) if P else None
                 s = float(row[best]) if P else 0.0
-                out.append(Match(None, None, s, float(nn[i, best]) if P else 0.0, float(cen[i, best]) if P else 0.0,
-                                 1.0 - confidence_from_score(s, threshold),
-                                 runner_up=self.names[self.person_ids[best]] if P else None,
-                                 runner_up_score=s if P else None))
+                m = Match(None, None, s, float(nn[i, best]) if P else 0.0, float(cen[i, best]) if P else 0.0,
+                          1.0 - confidence_from_score(s, threshold),
+                          runner_up=self.names[self.person_ids[best]] if P else None,
+                          runner_up_score=s if P else None, ambiguous=bool(ambiguous[i]))
+                if ambiguous[i]:
+                    second = int(ranked[1])
+                    m.confidence = 0.5
+                    m.runner_up = f"{self.names[self.person_ids[best]]} or {self.names[self.person_ids[second]]}"
+                out.append(m)
                 continue
             s = float(row[j])
             others = [k for k in ranked if k != j]
@@ -148,6 +161,5 @@ class Gallery:
                 confidence=confidence_from_score(s, threshold),
                 runner_up=self.names[self.person_ids[ru]] if ru is not None else None,
                 runner_up_score=ru_s,
-                ambiguous=bool(ru_s is not None and ru_s >= threshold and s - ru_s < ambiguity_margin),
             ))
         return out

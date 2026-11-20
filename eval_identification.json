@@ -1,0 +1,72 @@
+{
+  "setup": {
+    "lfw_dir": "/workspace/lfw_cache/lfw",
+    "people": 100,
+    "k": 3,
+    "probes": 5,
+    "unknown": 600,
+    "out": "eval_identification.json",
+    "gallery_photos": 300,
+    "known_probes": 371,
+    "unknown_probes": 600
+  },
+  "closed_set_rank1": 0.9973045822102425,
+  "by_threshold": [
+    {
+      "threshold": 0.25,
+      "known_correct": 0.9973045822102425,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.0026954177897574594,
+      "unknown_false_accept": 0.025
+    },
+    {
+      "threshold": 0.3,
+      "known_correct": 0.9973045822102425,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.0026954177897574594,
+      "unknown_false_accept": 0.0033333333333333335
+    },
+    {
+      "threshold": 0.35,
+      "known_correct": 0.9973045822102425,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.0026954177897574594,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.4,
+      "known_correct": 0.9946091644204852,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.005390835579514808,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.45,
+      "known_correct": 0.9919137466307277,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.008086253369272267,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.5,
+      "known_correct": 0.9919137466307277,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.008086253369272267,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.55,
+      "known_correct": 0.9757412398921833,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.02425876010781669,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.6,
+      "known_correct": 0.9568733153638814,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.04312668463611857,
+      "unknown_false_accept": 0.0
+    }
+  ]
+}

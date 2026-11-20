@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>FaceID · Missing Persons</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/mp.css">
+</head>
+<body class="mp-body">
+<header class="mp-top">
+  <div class="brand"><span class="logo" aria-hidden="true">◉</span> <span>FaceID · Missing Persons</span></div>
+  <nav class="mp-nav" id="nav">
+    <a href="#sighting" data-view="sighting">Report sighting</a>
+    <a href="#self" data-view="self">I'm safe</a>
+    <a href="#case" data-view="case" data-role="family admin" hidden>My cases</a>
+    <a href="#queue" data-view="queue" data-role="reviewer admin" hidden>Review queue</a>
+    <a href="#admin" data-view="admin" data-role="admin" hidden>Verification</a>
+  </nav>
+  <div class="mp-user"><span id="who" class="mono small muted"></span>
+    <a href="#login" id="login-link" class="mp-link">Sign in</a>
+    <button id="logout" class="mp-link" hidden>Sign out</button></div>
+</header>
+
+<main class="mp-main">
+  <!-- public: sighting -->
+  <section class="mp-view" id="v-sighting">
+    <h2>Report a sighting</h2>
+    <p class="muted small">Only submit a photo you took yourself. Group photos are fine: other people in it are never shown to families (they are blurred) and their face data is deleted once the photo is matched. It is compared only against <b>verified</b> missing-person cases.
+      Matches are checked by a trained reviewer before anything is shared with a family. Unmatched photos are deleted after
+      <span class="mono" id="ret-days">30</span> days.</p>
+    <form id="f-sighting" class="mp-form">
+      <label class="mp-drop">Photo<input type="file" name="file" accept="image/*" required><span class="mp-prev"></span></label>
+      <div class="mp-grid2">
+        <label>Where (optional)<input name="location_text" placeholder="Street, landmark, city"></label>
+        <label>When<input name="seen_at" type="datetime-local"></label>
+        <label>Latitude (optional)<input name="lat" inputmode="decimal" placeholder="47.6062"></label>
+        <label>Longitude (optional)<input name="lon" inputmode="decimal" placeholder="-122.3321"></label>
+      </div>
+      <button type="button" class="mp-link small" id="use-gps">Use my current location</button>
+      <label>Your contact (optional, only reviewers see it)<input name="submitter_contact" placeholder="email or phone"></label>
+      <label>Note<textarea name="note" rows="2" placeholder="Anything that helps a reviewer"></textarea></label>
+      <div class="mp-hp" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
+      <label class="mp-check"><input type="checkbox" name="consent" value="true" required> I took this photo myself and agree to it being compared with verified cases.</label>
+      <button class="btn primary">Submit sighting</button>
+      <p class="mp-msg" role="status"></p>
+    </form>
+  </section>
+
+  <!-- public: self report -->
+  <section class="mp-view" id="v-self" hidden>
+    <h2>I'm safe — don't locate me</h2>
+    <p class="muted small">If you are the person in a case and you are safe, enter the case code (e.g. from a poster). A reviewer confirms it,
+      the case is closed, and nothing about you — including any sightings — is shared. While it is reviewed, nothing is released.</p>
+    <form id="f-self" class="mp-form">
+      <label>Case code<input name="case_ref" placeholder="MP-XXXXXX" required class="mono"></label>
+      <label class="mp-drop">A current photo of you (optional, helps the reviewer confirm it's you)<input type="file" name="file" accept="image/*"><span class="mp-prev"></span></label>
+      <label>Message (optional)<textarea name="message" rows="3"></textarea></label>
+      <div class="mp-hp" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
+      <button class="btn primary">Send</button>
+      <p class="mp-msg" role="status"></p>
+    </form>
+  </section>
+
+  <!-- login / register -->
+  <section class="mp-view" id="v-login" hidden>
+    <h2>Sign in</h2>
+    <form id="f-login" class="mp-form narrow">
+      <label>Username<input name="username" required autocomplete="username"></label>
+      <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
+      <button class="btn primary">Sign in</button>
+      <p class="mp-msg" role="status"></p>
+    </form>
+    <details class="mp-details"><summary class="small muted">Family member? Create an account</summary>
+      <form id="f-register" class="mp-form narrow">
+        <label>Username<input name="username" required></label>
+        <label>Password (8+ chars)<input name="password" type="password" required minlength="8"></label>
+        <label>Contact (for the verifying admin)<input name="contact" placeholder="email / phone"></label>
+        <button class="btn">Create account</button>
+        <p class="mp-msg" role="status"></p>
+      </form></details>
+  </section>
+
+  <!-- family: cases -->
+  <section class="mp-view" id="v-case" hidden>
+    <div class="mp-cols">
+      <div>
+        <h2>Open a case</h2>
+        <p class="muted small">An administrator verifies every case (for example against a police report number) before it goes live.
+          Only reviewer-confirmed sightings are ever shown to you.</p>
+        <form id="f-case" class="mp-form">
+          <label>Missing person's name<input name="person_name" required></label>
+          <div class="mp-grid2">
+            <label>Last seen where<input name="last_seen_text"></label>
+            <label>Last seen when<input name="last_seen_at" type="date"></label>
+          </div>
+          <label>Description<textarea name="description" rows="3" placeholder="Height, clothing, anything distinctive"></textarea></label>
+          <label class="mp-drop">Recent photos of the person (1-10, face clearly visible)<input type="file" name="files" accept="image/*" multiple required><span class="mp-prev"></span></label>
+          <button class="btn primary">Submit case for verification</button>
+          <p class="mp-msg" role="status"></p>
+        </form>
+      </div>
+      <div>
+        <h2>My cases</h2>
+        <div id="my-cases" class="mp-list"><p class="muted small">No cases yet.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- reviewer queue -->
+  <section class="mp-view" id="v-queue" hidden>
+    <h2>Review queue <span class="mono small muted" id="q-meta"></span></h2>
+    <div id="q-self" class="mp-list"></div>
+    <div id="q-matches" class="mp-list"></div>
+  </section>
+
+  <!-- admin -->
+  <section class="mp-view" id="v-admin" hidden>
+    <div class="mp-tabs"><button data-st="pending" class="on">Pending</button><button data-st="verified">Verified</button><button data-st="all">All</button></div>
+    <h2>Case verification</h2>
+    <div id="a-cases" class="mp-list"></div>
+    <hr class="hairline">
+    <div class="mp-cols">
+      <div>
+        <h2>Users</h2>
+        <form id="f-user" class="mp-form row">
+          <input name="username" placeholder="username" required><input name="password" type="password" placeholder="password" required minlength="8">
+          <select name="role"><option>reviewer</option><option>family</option><option>admin</option></select>
+          <button class="btn">Add</button><p class="mp-msg"></p>
+        </form>
+        <div id="a-users" class="mp-list small"></div>
+        <button class="mp-link small" id="purge">Run retention purge now</button> <span class="mp-msg small" id="purge-msg"></span>
+      </div>
+      <div>
+        <h2>Audit log</h2>
+        <div id="a-audit" class="mp-audit mono small"></div>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="/static/mp-guard.js"></script>
+<script src="/static/mp.js"></script>
+</body>
+</html>

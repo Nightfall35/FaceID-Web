@@ -3,40 +3,81 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FaceID</title>
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0d12">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/static/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/hologram.css">
+<script src="/static/sfx.js" defer></script>
+<script src="/static/hologram.js" defer></script>
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><span class="logo">◉</span> FaceID</div>
+  <div class="brand"><span class="logo" aria-hidden="true"></span>FaceID <span class="sys-status" title="Recognition engine online"><i></i>System Active</span></div>
   <nav class="tabs" role="tablist">
-    <button class="tab active" data-view="identify">Identify</button>
-    <button class="tab" data-view="enroll">Enroll</button>
-    <button class="tab" data-view="settings">Settings</button>
+    <span class="tab-pill" aria-hidden="true"></span>
+    <button class="tab active" data-view="identify" role="tab">Live</button>
+    <span class="tab-dot" aria-hidden="true"></span>
+    <button class="tab" data-view="enroll" role="tab">Enrolled</button>
+    <span class="tab-dot" aria-hidden="true"></span>
+    <button class="tab" data-view="settings" role="tab">Settings</button>
   </nav>
-  <button class="btn ghost small" id="logout" hidden>Sign out</button>
+  <div class="top-actions">
+    <button class="text-btn small" id="logout" hidden>Sign out</button>
+    <button class="sfx" id="sfx-toggle" type="button" title="Sound effects" aria-label="Sound effects" aria-pressed="false">🔊</button>
+  </div>
 </header>
 
 <main>
-  <!-- IDENTIFY -->
+  <!-- LIVE RECOGNITION -->
   <section class="view" id="view-identify">
-    <div class="view-head">
-      <div>
-        <h1>Identify faces</h1>
-        <p class="muted">Upload photos. Every face is detected and matched only against people you've enrolled.</p>
+    <div class="live" id="live" data-mode="idle">
+      <div class="readout-side left">
+        <div class="verdict-block" id="status-card" data-state="idle" aria-live="polite">
+          <div class="status-title" id="status-title">Awaiting Scan</div>
+          <div class="status-icon" id="status-ring" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="i-ok"><path d="M6 12.5l4 4 8-9"/></svg>
+            <svg viewBox="0 0 24 24" class="i-bad"><path d="M7 7l10 10M17 7L7 17"/></svg>
+            <svg viewBox="0 0 24 24" class="i-amb"><path d="M9.2 9a3 3 0 1 1 4.3 2.7c-1 .5-1.5 1.1-1.5 2.1M12 17.2v.3"/></svg>
+            <svg viewBox="0 0 24 24" class="i-idle"><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <div class="status-sub" id="status-sub">Drop a photo or start the camera</div>
+        </div>
       </div>
-      <div class="threshold-box">
-        <label for="thr">Match threshold <b id="thr-val">0.45</b></label>
-        <input type="range" id="thr" min="0.2" max="0.7" step="0.01" value="0.45">
-        <div class="hint"><span>more matches</span><span>stricter</span></div>
+
+      <label class="stage-drop" id="id-drop" aria-label="Recognition stage: drop photos here">
+        <input type="file" id="id-files" accept="image/*" multiple hidden>
+        <canvas class="mesh-fallback" id="idle-mesh" aria-hidden="true"></canvas>
+        <div id="hologram-stage" class="hologram-stage"></div>
+        <video id="stage-video" autoplay playsinline muted></video>
+        <div class="stage-oval" aria-hidden="true"></div>
+        <div class="beam" aria-hidden="true"></div>
+        <div class="cam-msg" id="stage-msg" hidden></div>
+      </label>
+
+      <div class="readout-side right">
+        <div class="conf-block" id="conf-block" data-state="idle">
+          <div class="conf-label">Confidence</div>
+          <div class="conf-val" id="conf-val">—</div>
+          <svg class="arc" id="arc" viewBox="0 0 120 120" aria-hidden="true"></svg>
+          <div class="conf-sub" id="conf-sub"></div>
+        </div>
       </div>
     </div>
-    <label class="dropzone" id="id-drop">
-      <input type="file" id="id-files" accept="image/*" multiple hidden>
-      <div class="dz-icon">⤒</div>
-      <div><b>Drop photos here</b> or click to choose</div>
-      <div class="muted small">JPG, PNG, WebP · multiple files OK</div>
-    </label>
-    <div id="id-status" class="status"></div>
+
+    <div class="controls">
+      <span class="text-btn accent" id="pick-files" role="button" tabindex="0">⤒ Upload photos</span>
+      <button class="text-btn" id="id-cam" type="button">◎ Start camera</button>
+      <button class="text-btn accent" id="stage-snap" type="button" hidden>◉ Capture &amp; identify</button>
+      <button class="text-btn" id="stage-stop" type="button" hidden>✕ Stop camera</button>
+      <div class="threshold-box">
+        <label for="thr">threshold <b id="thr-val">0.45</b></label>
+        <input type="range" id="thr" min="0.2" max="0.7" step="0.01" value="0.45" aria-label="Match threshold (left: more matches, right: stricter)">
+      </div>
+    </div>
+    <div class="pipeline" id="id-pipeline" hidden></div>
+    <div id="id-status" class="status" aria-live="polite"></div>
     <div id="id-results"></div>
   </section>
 
@@ -44,12 +85,12 @@
   <section class="view" id="view-enroll" hidden>
     <div class="view-head">
       <div>
-        <h1>Enrolled people</h1>
+        <h1>Enrolled Faces</h1>
         <p class="muted">Only enroll people who have agreed to it. Add 3+ clear, varied photos per person (front and slight angles, different lighting, with/without glasses) for the best accuracy.</p>
       </div>
       <form id="new-person" class="inline-form">
         <input name="name" placeholder="New person's name" required maxlength="100">
-        <button class="btn primary">Add person</button>
+        <button class="text-btn accent">＋ Enroll new face</button>
       </form>
     </div>
     <div id="people" class="people-grid"></div>
@@ -92,20 +133,45 @@
   </section>
 </main>
 
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div class="cam-modal" id="cam-modal" hidden role="dialog" aria-modal="true" aria-labelledby="cam-title">
+  <div class="card cam-panel">
+    <div class="cam-head">
+      <h2 id="cam-title">Live capture</h2>
+      <button class="icon-btn" id="cam-close" type="button" aria-label="Close camera">✕</button>
+    </div>
+    <div class="cam-view" id="cam-view">
+      <video id="cam-video" autoplay playsinline muted></video>
+      <div class="reticle" aria-hidden="true">
+        <div class="oval"></div><div class="xh"></div><div class="brk"></div>
+        <div class="hud-txt"><span><span class="rec">●</span> LIVE</span><span id="cam-hint">ALIGN FACE IN OVAL</span><span id="cam-res"></span></div>
+      </div>
+      <div class="cam-msg" id="cam-msg" hidden></div>
+    </div>
+    <div class="cam-actions">
+      <button class="btn ghost" id="cam-cancel" type="button">Cancel</button>
+      <button class="btn primary" id="cam-snap" type="button">◉ Capture</button>
+    </div>
+  </div>
+</div>
 
 <template id="person-tpl">
   <article class="card person">
     <div class="person-head">
-      <div class="avatar"></div>
+      <div class="av-ring" title="Enrollment completeness (3+ photos recommended)"><div class="avatar"></div><span class="ring-lbl"></span></div>
       <div class="pmeta"><h3 class="pname"></h3><span class="muted small pcount"></span></div>
-      <button class="icon-btn del-person" title="Delete person">🗑</button>
+      <button class="icon-btn del-person" title="Delete person" aria-label="Delete person">🗑</button>
     </div>
+    <div class="qmeters"></div>
     <div class="thumbs"></div>
-    <label class="upload-btn">
-      <input type="file" accept="image/*" multiple hidden>
-      <span>＋ Add photos</span>
-    </label>
+    <div class="enroll-actions">
+      <label class="upload-btn">
+        <input type="file" accept="image/*" multiple hidden>
+        <span>＋ Add photos</span>
+      </label>
+      <button class="btn cam-enroll" type="button" title="Capture from camera">◎ Camera</button>
+    </div>
     <label class="small muted force"><input type="checkbox" class="force-cb"> force (skip "doesn't look like" check)</label>
     <div class="enroll-log"></div>
   </article>

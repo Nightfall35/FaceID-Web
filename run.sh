@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-command local run:  ./run.sh            (http://localhost:8000)
 #   FACEID_PASSWORD=secret PORT=9000 ./run.sh
+#   FACEID_OPERATOR_NAME=Altair ./run.sh   (name shown on the login loader; default ALTAIR)
 set -euo pipefail
 cd "$(dirname "$0")"
 PY="${PYTHON:-python3}"

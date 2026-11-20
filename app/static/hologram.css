@@ -1,0 +1,66 @@
+/* FaceID · 3D hologram stage (pairs with hologram.js). Frameless: no boxes, no cards. Cyan/teal + status colours only. */
+.fh-root { position: absolute; inset: 0; overflow: hidden; pointer-events: none; user-select: none;
+  --fh-cyan: #38bdf8; --fh-teal: #2dd4bf; --fh-ok: #2fd18b; --fh-bad: #ff5d6c; --fh-amb: #ffb547;
+  font-family: var(--font-sans, Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); color: #d8f6ff; }
+.fh-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* scanlines + soft shimmer over the whole hologram */
+.fh-scan { position: absolute; inset: 0; z-index: 4; mix-blend-mode: screen; opacity: .55;
+  background: repeating-linear-gradient(180deg, rgba(56, 189, 248, .055) 0 1px, transparent 1px 3px);
+  -webkit-mask: radial-gradient(ellipse 45% 55% at 50% 45%, #000 40%, transparent 85%); mask: radial-gradient(ellipse 45% 55% at 50% 45%, #000 40%, transparent 85%); }
+.fh-scan::after { content: ""; position: absolute; left: 0; right: 0; height: 18%; top: -20%;
+  background: linear-gradient(180deg, transparent, rgba(45, 212, 191, .08), transparent); animation: fh-shimmer 6s linear infinite; }
+.fh-root[data-state="scanning"] .fh-scan::after { animation-duration: 1.4s; background: linear-gradient(180deg, transparent, rgba(56, 189, 248, .2), transparent); }
+@keyframes fh-shimmer { to { top: 110%; } }
+
+/* orbiting enrolled people */
+.fh-nodes { position: absolute; inset: 0; z-index: 2; }
+.fh-node { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform, opacity; transition: opacity .25s; }
+.fh-av { position: absolute; left: -19px; top: -19px; width: 38px; height: 38px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+  border: 1.5px solid rgba(56, 189, 248, .75); background: radial-gradient(circle, rgba(56, 189, 248, .18), rgba(4, 10, 20, .6));
+  box-shadow: 0 0 12px rgba(56, 189, 248, .45), inset 0 0 8px rgba(56, 189, 248, .35); }
+.fh-av img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.35) brightness(1.05) sepia(.25) hue-rotate(150deg); opacity: .9; }
+.fh-av b { font-weight: 600; font-size: 15px; line-height: 1; color: var(--fh-cyan); text-shadow: 0 0 8px rgba(56, 189, 248, .8); }
+.fh-nm { position: absolute; top: -8px; left: 26px; white-space: nowrap; font-size: 12.5px; letter-spacing: .02em; color: #cdeffd; text-shadow: 0 0 8px rgba(56, 189, 248, .55); }
+.fh-node.fh-left .fh-nm { left: auto; right: 26px; }
+.fh-node.fh-hit .fh-av { border-color: var(--fh-ok); box-shadow: 0 0 18px rgba(47, 209, 139, .8), inset 0 0 8px rgba(47, 209, 139, .5); }
+.fh-node.fh-hit .fh-av img { filter: none; }
+.fh-node.fh-hit .fh-nm { color: #b9ffe0; text-shadow: 0 0 10px rgba(47, 209, 139, .8); }
+.fh-node.fh-hit { opacity: 1 !important; z-index: 5 !important; }
+.fh-more { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(125, 211, 252, .6); }
+
+/* floating verdict label (frameless) */
+.fh-label { --c: var(--fh-cyan); position: absolute; z-index: 3; display: flex; align-items: center; gap: 12px; transform: translate(-100%, -50%); opacity: 0; }
+.fh-label[data-state="known"] { --c: var(--fh-ok); } .fh-label[data-state="unknown"] { --c: var(--fh-bad); } .fh-label[data-state="ambiguous"] { --c: var(--fh-amb); }
+.fh-txt { display: flex; flex-direction: column; align-items: flex-end; order: -1; text-align: right; }
+.fh-title { font-size: 17px; letter-spacing: .03em; color: var(--c); text-shadow: 0 0 12px var(--c); }
+.fh-name { font-size: 13px; color: #cfe9f5; opacity: .85; margin-top: 2px; }
+.fh-ring { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--c); border: 2px solid var(--c);
+  box-shadow: 0 0 16px var(--c), inset 0 0 10px color-mix(in srgb, var(--c) 45%, transparent); }
+.fh-ring svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.fh-ring path { display: none; }
+.fh-label[data-state="known"] .fh-i-ok, .fh-label[data-state="unknown"] .fh-i-bad, .fh-label[data-state="ambiguous"] .fh-i-amb { display: block; }
+.fh-label[data-state="scanning"] .fh-ring { border-color: rgba(56, 189, 248, .2); border-top-color: var(--fh-cyan); animation: fh-spin 1s linear infinite; }
+.fh-label[data-state="known"] .fh-ring, .fh-label[data-state="unknown"] .fh-ring, .fh-label[data-state="ambiguous"] .fh-ring { animation: fh-pop .5s cubic-bezier(.2, .8, .2, 1); }
+.fh-label[data-state="unknown"] .fh-txt { animation: fh-glitch .45s steps(2) 1; }
+@keyframes fh-spin { to { transform: rotate(360deg); } }
+@keyframes fh-pop { 0% { transform: scale(.55); opacity: .2; } 60% { transform: scale(1.12); } }
+@keyframes fh-glitch { 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
+
+/* confidence readout (the arc itself is drawn on the canvas) */
+.fh-conf { --c: #9ff0ff; position: absolute; z-index: 3; transform: translateY(-100%); display: flex; flex-direction: column; opacity: 0; }
+.fh-conf[data-state="unknown"] { --c: var(--fh-bad); } .fh-conf[data-state="ambiguous"] { --c: var(--fh-amb); }
+.fh-conf-lbl { font-size: 13px; letter-spacing: .06em; color: #cfe9f5; opacity: .85; }
+.fh-conf-val { font-size: calc(var(--fh-s, 120px) * .2); line-height: 1.1; color: var(--c); text-shadow: 0 0 12px var(--c); font-variant-numeric: tabular-nums; }
+
+.fh-no-overlay .fh-label, .fh-no-overlay .fh-conf { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fh-scan::after, .fh-label *, .fh-ring { animation: none !important; }
+  .fh-node { transition: none; }
+}
+
+/* keep-out placement (see measureAvoid in hologram.js) */
+.fh-nm { transition: opacity .2s; }
+.fh-node.fh-below .fh-nm { left: 0; right: auto; top: 22px; transform: translateX(-50%); }
+.fh-node.fh-nm-off .fh-nm { opacity: 0; }
+.fh-node.fh-blocked .fh-nm { opacity: 0; }

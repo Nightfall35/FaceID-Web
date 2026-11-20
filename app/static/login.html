@@ -2,23 +2,87 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>FaceID · Sign in</title>
 <link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/login-hud.css">
+<link rel="stylesheet" href="/static/login-loader.css">
 </head>
-<body class="login-body">
-  <form class="card login-card" id="login">
-    <div class="brand big"><span class="logo">◉</span> FaceID</div>
-    <p class="muted">Private face recognition for people you've enrolled.</p>
-    <label>Password<input type="password" name="password" autofocus required autocomplete="current-password"></label>
-    <button class="btn primary" type="submit">Sign in</button>
-    <p class="error" id="err"></p>
-  </form>
+<body class="login-body hud-gate state-idle">
+  <main class="holo-stage">
+    <div class="holo-scene" aria-hidden="true">
+      <div class="holo-beam"><span class="holo-sweep"></span></div>
+      <div class="holo-base">
+        <div class="holo-disc">
+          <span class="hud-ring r1"></span><span class="hud-ring r2"></span>
+          <span class="hud-ring r3"></span><span class="hud-ring r4"></span>
+          <span class="holo-core"></span>
+        </div>
+      </div>
+    </div>
+    <form class="holo-form login-card" id="login">
+      <div class="brand big"><span class="logo" aria-hidden="true">◉</span> <span>FaceID</span></div>
+      <p class="hud-status" id="hud-status" aria-hidden="true">Awaiting credentials</p>
+      <p class="muted">Private face recognition for people you've enrolled.</p>
+      <label>Password<input type="password" name="password" autofocus required autocomplete="current-password" aria-describedby="err"></label>
+      <button class="btn primary" type="submit">Sign in</button>
+      <p class="error" id="err" role="alert" aria-live="assertive"></p>
+    </form>
+  </main>
+<script src="/static/sfx.js"></script>
+<script src="/static/login-loader.js"></script>
 <script>
-document.getElementById('login').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const r = await fetch('/api/login', {method: 'POST', body: new FormData(e.target)});
-  if (r.ok) location.href = '/'; else document.getElementById('err').textContent = 'Wrong password';
-});
+(() => {
+  const form = document.getElementById('login');
+  const body = document.body;
+  const statusEl = document.getElementById('hud-status');
+  const reduceMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const LABELS = { idle: 'Awaiting credentials', scanning: 'Verifying…', denied: 'Access denied', granted: 'Access granted' };
+  // Purely visual state; never affects request/redirect logic.
+  const setState = (s) => {
+    try {
+      body.classList.remove('state-idle', 'state-scanning', 'state-denied', 'state-granted');
+      void body.offsetWidth; // restart animations (e.g. repeated shake)
+      body.classList.add('state-' + s);
+      form.classList.toggle('is-scanning', s === 'scanning');
+      form.style.setProperty('--card-h', form.offsetHeight + 'px');
+      statusEl.textContent = LABELS[s] || '';
+    } catch (_) {}
+  };
+  const sfx = (k) => { try { window.FaceSfx && window.FaceSfx.play(k); } catch (_) {} };
+
+  // --- original login logic (unchanged semantics), with visual states around it ---
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setState('scanning'); sfx('scan');
+    let r;
+    try {
+      r = await fetch('/api/login', {method: 'POST', body: new FormData(e.target)});
+    } catch (err) {
+      setState('idle');
+      throw err; // same as before: network errors are not caught/displayed
+    }
+    if (r.ok) {
+      setState('granted');
+      const go = () => { location.href = '/'; };
+      // Redirect-timing hook: play the Holographic Scan loader, redirect when it finishes (or is skipped).
+      let name = null;
+      try { const j = await r.clone().json(); name = j && (j.name || j.username || j.user) || null; } catch (_) {}
+      let loader = null;
+      try { if (window.FaceLoginLoader) loader = window.FaceLoginLoader.play({ name, onDone: go, sfx }); } catch (_) { loader = null; }
+      if (!loader) {                           // fallback: original behaviour
+        sfx('match');
+        if (reduceMotion()) go();
+        else setTimeout(go, 550);
+      }
+    } else {
+      setState('denied'); sfx('unknown');
+      const errEl = document.getElementById('err');
+      errEl.textContent = '';                 // clear first so screen readers re-announce
+      setTimeout(() => { errEl.textContent = 'Wrong password'; }, 30);
+    }
+  });
+})();
 </script>
 </body>
 </html>

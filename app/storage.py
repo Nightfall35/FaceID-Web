@@ -45,6 +45,17 @@ class Store:
         self._conn.executescript(SCHEMA)
         self._conn.commit()
 
+    def _one(self, sql: str, params=()):
+        # The connection is shared across FastAPI's threadpool; serialise reads too, otherwise
+        # concurrent requests (e.g. several thumbnails loading at once) intermittently fail with
+        # sqlite3.InterfaceError / missing rows.
+        with self._lock:
+            return self._conn.execute(sql, params).fetchone()
+
+    def _all(self, sql: str, params=()):
+        with self._lock:
+            return self._conn.execute(sql, params).fetchall()
+
     # ---- people ----
     def create_person(self, name: str, notes: str = "") -> dict:
         with self._lock:
@@ -54,7 +65,7 @@ class Store:
             return self.get_person(cur.lastrowid)
 
     def get_person(self, pid: int) -> dict | None:
-        r = self._conn.execute("SELECT * FROM people WHERE id=?", (pid,)).fetchone()
+        r = self._one("SELECT * FROM people WHERE id=?", (pid,))
         return dict(r) if r else None
 
     def rename_person(self, pid: int, name: str):
@@ -63,9 +74,9 @@ class Store:
             self._conn.commit()
 
     def list_people(self) -> list[dict]:
-        rows = self._conn.execute(
+        rows = self._all(
             "SELECT p.*, COUNT(ph.id) AS photo_count FROM people p LEFT JOIN photos ph ON ph.person_id=p.id "
-            "GROUP BY p.id ORDER BY p.name COLLATE NOCASE").fetchall()
+            "GROUP BY p.id ORDER BY p.name COLLATE NOCASE")
         out = []
         for r in rows:
             d = dict(r)
@@ -106,22 +117,22 @@ class Store:
         return d
 
     def get_photo(self, phid: int) -> dict | None:
-        r = self._conn.execute("SELECT * FROM photos WHERE id=?", (phid,)).fetchone()
+        r = self._one("SELECT * FROM photos WHERE id=?", (phid,))
         return self._photo_dict(r) if r else None
 
     def list_photos(self, pid: int) -> list[dict]:
-        rows = self._conn.execute("SELECT * FROM photos WHERE person_id=? ORDER BY id", (pid,)).fetchall()
+        rows = self._all("SELECT * FROM photos WHERE person_id=? ORDER BY id", (pid,))
         return [self._photo_dict(r) for r in rows]
 
     def person_embeddings(self, pid: int) -> np.ndarray:
-        rows = self._conn.execute("SELECT embedding FROM photos WHERE person_id=?", (pid,)).fetchall()
+        rows = self._all("SELECT embedding FROM photos WHERE person_id=?", (pid,))
         if not rows:
             return np.zeros((0, 512), np.float32)
         return np.stack([np.frombuffer(r[0], np.float32) for r in rows])
 
     def all_embeddings(self) -> list[tuple[int, str, np.ndarray]]:
-        rows = self._conn.execute(
-            "SELECT ph.person_id, p.name, ph.embedding FROM photos ph JOIN people p ON p.id=ph.person_id").fetchall()
+        rows = self._all(
+            "SELECT ph.person_id, p.name, ph.embedding FROM photos ph JOIN people p ON p.id=ph.person_id")
         return [(r[0], r[1], np.frombuffer(r[2], np.float32).copy()) for r in rows]
 
     def _remove_files(self, ph: dict):
@@ -143,7 +154,7 @@ class Store:
 
     # ---- settings ----
     def get_setting(self, key: str, default=None):
-        r = self._conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        r = self._one("SELECT value FROM settings WHERE key=?", (key,))
         return json.loads(r[0]) if r else default
 
     def set_setting(self, key: str, value):
@@ -163,6 +174,6 @@ class Store:
             os.makedirs(self.photo_dir, exist_ok=True)
 
     def stats(self) -> dict:
-        p = self._conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
-        ph = self._conn.execute("SELECT COUNT(*) FROM photos").fetchone()[0]
+        p = self._one("SELECT COUNT(*) FROM people")[0]
+        ph = self._one("SELECT COUNT(*) FROM photos")[0]
         return {"people": p, "photos": ph}

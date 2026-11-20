@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaceID · Hologram demo</title>
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/hologram.css">
+<style>
+  @font-face { font-family: "Inter"; src: url(/static/fonts/inter-var.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at 50% 40%, #071423 0%, #03060c 70%); color: #cfe9f5; font-family: Inter, system-ui, sans-serif; }
+  #hologram-stage { position: absolute; inset: 0 0 56px 0; }
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 56px; display: flex; gap: 22px; align-items: center; justify-content: center; font-size: 13px; letter-spacing: .08em; }
+  .bar button { background: none; border: 0; color: #7dd3fc; font: inherit; letter-spacing: inherit; cursor: pointer; text-transform: uppercase; }
+  .bar button.on { color: #2dd4bf; text-shadow: 0 0 10px #2dd4bf; }
+</style>
+</head>
+<body>
+<div id="hologram-stage"></div>
+<div class="bar">
+  <button data-s="cycle" class="on">Cycle</button><button data-s="idle">Idle</button><button data-s="scanning">Scanning</button>
+  <button data-s="known">Known</button><button data-s="unknown">Unknown</button><button data-s="ambiguous">Ambiguous</button>
+</div>
+<script src="/static/hologram.js"></script>
+<script>
+  'use strict';
+  // fake avatars (inline SVG, no network)
+  const av = (name, hue) => 'data:image/svg+xml,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="hsl(${hue},45%,22%)"/>` +
+    `<circle cx="32" cy="25" r="12" fill="hsl(${hue},40%,62%)"/><path d="M10 64c2-14 11-20 22-20s20 6 22 20z" fill="hsl(${hue},40%,55%)"/></svg>`);
+  const people = ['Ava Chen', 'Priya Shah', 'Marcus Lee', 'Ethan Moreau', 'Jordan Blake', 'Sofia Ramirez', 'Noah Kim', 'Lena Fischer']
+    .map((name, i) => ({ id: i + 1, name, thumbUrl: av(name, 170 + i * 9) }));
+  // results in the exact app.js shape: { name, status, confidence, kps } (kps = 5 points in image pixels)
+  const RESULTS = {
+    known: { name: 'Priya Shah', status: 'known', confidence: 0.992, kps: [[210, 240], [290, 236], [262, 290], [222, 332], [284, 330]] },
+    unknown: { name: 'Unknown', status: 'unknown', confidence: 0.18, kps: [[200, 240], [282, 244], [228, 292], [210, 334], [270, 336]] },
+    ambiguous: { name: 'Marcus Lee', status: 'ambiguous', confidence: 0.5, kps: [[205, 238], [287, 238], [246, 290], [214, 332], [278, 332]] },
+  };
+  const H = window.FaceHologram;
+  H.mount(document.getElementById('hologram-stage'), { overlay: true });
+  H.setPeople(people);
+  let timer = null;
+  const show = (s) => {
+    if (s === 'idle') { H.update(null); H.setState('idle'); }
+    else if (s === 'scanning') H.setState('scanning');
+    else { H.update(RESULTS[s]); H.setState('result'); }
+  };
+  function cycle() {
+    const seq = [['idle', 2200], ['scanning', 1600], ['known', 4200], ['scanning', 1600], ['unknown', 4200], ['scanning', 1600], ['ambiguous', 4200]];
+    let i = 0;
+    const next = () => { const [s, ms] = seq[i++ % seq.length]; show(s); timer = setTimeout(next, ms); };
+    next();
+  }
+  const pick = (s) => {
+    clearTimeout(timer);
+    document.querySelectorAll('.bar button').forEach((b) => b.classList.toggle('on', b.dataset.s === s));
+    s === 'cycle' ? cycle() : show(s);
+  };
+  document.querySelectorAll('.bar button').forEach((b) => b.addEventListener('click', () => pick(b.dataset.s)));
+  pick(new URLSearchParams(location.search).get('state') || 'cycle'); // ?state=known|unknown|ambiguous|scanning|idle freezes a state
+</script>
+</body>
+</html>

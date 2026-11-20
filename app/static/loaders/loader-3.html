@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loader 3 · Holographic Scan</title>
+<style>
+@font-face { font-family: "Plex Mono"; src: url("../fonts/plexmono-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Plex Mono"; src: url("../fonts/plexmono-600.woff2") format("woff2"); font-weight: 600; }
+:root { --c1:#38bdf8; --c2:#2dd4bf; --ok:#2fd18b; --muted:#5f7387; }
+html, body { margin: 0; height: 100%; overflow: hidden; color: #cfefff; cursor: pointer; user-select: none;
+  background: radial-gradient(900px 600px at 50% 80%, rgba(56,189,248,.08), transparent 70%), #04070b;
+  font: 14px/1.5 "Plex Mono", ui-monospace, Consolas, monospace; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.7)); }
+.scan { position: fixed; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(255,255,255,.025) 0 1px, transparent 1px 3px); }
+.tag { position: fixed; left: 18px; top: 14px; font-size: 11px; letter-spacing: .22em; color: var(--muted); z-index: 5; }
+.tag a { color: var(--c1); text-decoration: none; }
+.hint { position: fixed; right: 18px; bottom: 14px; font-size: 11px; letter-spacing: .22em; color: var(--muted); z-index: 5; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="scan"></div><div class="vig"></div>
+<div class="tag"><a href="index.html">&larr; SAMPLES</a> &nbsp;/&nbsp; 03 · HOLOGRAPHIC SCAN</div>
+<div class="hint">CLICK TO REPLAY</div>
+<script>
+(() => {
+  const Q = new URLSearchParams(location.search);
+  const FT = Q.has('t') ? parseFloat(Q.get('t')) : null;
+  const NAME = (Q.get('name') || 'ALTAIR').toUpperCase();
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const GRANT = 3.6, CYCLE = 7;
+  let t0 = performance.now();
+  addEventListener('click', e => { if (!e.target.closest('a')) t0 = performance.now(); });
+  const clock = () => FT != null ? FT : RM ? GRANT + 1.5 : ((performance.now() - t0) / 1000) % CYCLE;
+  const hash = (a, b = 0) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const ease = x => 1 - Math.pow(1 - clamp(x), 3);
+  const mix = (a, b, k) => a + (b - a) * k;
+
+  const cv = document.getElementById('cv'), g = cv.getContext('2d');
+  let W, H, DPR;
+  function size() { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; g.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  size(); addEventListener('resize', () => { size(); if (FT != null || RM) frame(); });
+
+  // fibonacci inner core points
+  const CORE = []; for (let i = 0; i < 140; i++) { const y = 1 - (i / 139) * 2, r = Math.sqrt(1 - y * y), a = i * 2.399963; CORE.push([Math.cos(a) * r, y, Math.sin(a) * r]); }
+  const RINGS = [
+    { tilt: 1.15, roll: 0.35, r: 1.55, sp: 0.9, label: 'KPS 5/5 LOCKED', n: 3 },
+    { tilt: 1.35, roll: -0.5, r: 1.8, sp: -0.6, label: 'EMBED 512-D', n: 4 },
+    { tilt: 0.95, roll: 0.0, r: 2.05, sp: 0.4, label: 'LIVENESS 0.94', n: 5 },
+  ];
+
+  function frame() {
+    const t = clock();
+    const gr = clamp((t - GRANT) / 0.6), ge = ease(gr);
+    const prog = clamp((t - 0.2) / (GRANT - 0.4));
+    const C1 = gr > 0 ? [47, 209, 139] : [56, 189, 248], C2 = gr > 0 ? [127, 240, 191] : [45, 212, 191];
+    const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+    g.clearRect(0, 0, W, H);
+    const CX = W / 2, CY = H * 0.41, R = Math.min(W, H) * 0.17 * (1 + ge * 0.08);
+    const rotY = t * (t < GRANT ? 0.9 : 0.35) + 0.4, rotX = -0.28;
+    const P = (x, y, z) => { let c = Math.cos(rotY), s = Math.sin(rotY); let X = x * c + z * s, Z = -x * s + z * c; c = Math.cos(rotX); s = Math.sin(rotX); const Y = y * c - Z * s; Z = y * s + Z * c; const k = 3.2 / (3.2 - Z); return [CX + X * R * k, CY + Y * R * k, Z]; };
+    const scanY = Math.sin(t * 2.4) * 1.05;       // laser band in model space (-1..1)
+    const band = y => Math.max(0, 1 - Math.abs(y - scanY) / 0.12);
+
+    // projector base + beam
+    const BY = H * 0.87;
+    const beam = g.createLinearGradient(0, BY, 0, CY - R);
+    beam.addColorStop(0, rgba(C1, .22)); beam.addColorStop(1, rgba(C1, 0));
+    g.fillStyle = beam; g.beginPath(); g.moveTo(CX - R * 0.55, BY); g.lineTo(CX + R * 0.55, BY); g.lineTo(CX + R * 1.5, CY - R * 0.4); g.lineTo(CX - R * 1.5, CY - R * 0.4); g.closePath(); g.fill();
+    for (let i = 0; i < 4; i++) { g.strokeStyle = rgba(C1, 0.5 - i * 0.1); g.lineWidth = i ? 1 : 2; g.beginPath(); g.ellipse(CX, BY, R * (0.6 + i * 0.28), R * (0.13 + i * 0.06), 0, 0, Math.PI * 2); g.stroke(); }
+    g.setLineDash([4, 10]); g.lineDashOffset = -t * 40; g.strokeStyle = rgba(C2, .6); g.beginPath(); g.ellipse(CX, BY, R * 1.6, R * 0.36, 0, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+
+    // orbit rings (back halves first)
+    const ringPts = RINGS.map((rg, ri) => {
+      const tilt = mix(rg.tilt, 0.06 * ri, ge), roll = mix(rg.roll, 0, ge), r = rg.r * mix(1, 0.92 + ri * 0.04, ge), pts = [];
+      for (let i = 0; i <= 96; i++) { const a = i / 96 * Math.PI * 2; let x = Math.cos(a) * r, y = 0, z = Math.sin(a) * r; const yy = y * Math.cos(tilt) - z * Math.sin(tilt), zz = y * Math.sin(tilt) + z * Math.cos(tilt); const xr = x * Math.cos(roll) - yy * Math.sin(roll), yr = x * Math.sin(roll) + yy * Math.cos(roll); pts.push([xr, yr, zz]); }
+      return { rg, r, tilt, pts };
+    });
+    const drawRing = (front) => ringPts.forEach(({ rg, pts }, ri) => {
+      g.lineWidth = 1;
+      for (let i = 0; i < 96; i++) { const a = P(...pts[i]), b = P(...pts[i + 1]); if ((a[2] > 0) !== front) continue; g.strokeStyle = rgba(ri === 1 ? C2 : C1, front ? .55 : .18); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+      for (let k = 0; k < rg.n; k++) {
+        const u = ((t * rg.sp * 0.25 + k / rg.n) % 1 + 1) % 1, idx = Math.floor(u * 96), p = P(...pts[idx]);
+        if ((p[2] > 0) !== front) continue;
+        g.fillStyle = rgba(C2, front ? 1 : .35); g.shadowColor = rgba(C2, 1); g.shadowBlur = front ? 12 : 0;
+        g.beginPath(); g.arc(p[0], p[1], front ? 3.2 : 2, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0;
+        if (front && k === 0) { g.font = '11px "Plex Mono", Consolas, monospace'; g.fillStyle = rgba([207, 239, 255], .85); g.textAlign = 'left'; g.fillText(rg.label, p[0] + 10, p[1] - 8); g.strokeStyle = rgba(C2, .5); g.beginPath(); g.moveTo(p[0] + 4, p[1] - 4); g.lineTo(p[0] + 9, p[1] - 9); g.stroke(); }
+      }
+    });
+    drawRing(false);
+
+    // wireframe head-globe: latitude + longitude
+    const sy = 1.12;
+    for (let la = -5; la <= 5; la++) {
+      const phi = la / 6 * Math.PI / 2, y = Math.sin(phi) * sy, rr = Math.cos(phi);
+      let prev = null;
+      for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2, p = P(Math.cos(a) * rr, -y, Math.sin(a) * rr); if (prev) { const b = band(y); g.strokeStyle = b > 0 ? rgba([210, 250, 255], .35 + b * .65) : rgba(C1, (p[2] > 0 ? .5 : .12)); g.lineWidth = b > 0.5 ? 1.6 : 1; g.beginPath(); g.moveTo(prev[0], prev[1]); g.lineTo(p[0], p[1]); g.stroke(); } prev = p; }
+    }
+    for (let lo = 0; lo < 18; lo++) {
+      const a = lo / 18 * Math.PI * 2; let prev = null;
+      for (let i = 0; i <= 40; i++) { const phi = -Math.PI / 2 + i / 40 * Math.PI, y = Math.sin(phi) * sy, p = P(Math.cos(a) * Math.cos(phi), -y, Math.sin(a) * Math.cos(phi)); if (prev) { const b = band(y); g.strokeStyle = b > 0 ? rgba([210, 250, 255], .3 + b * .6) : rgba(C1, p[2] > 0 ? .4 : .1); g.lineWidth = 1; g.beginPath(); g.moveTo(prev[0], prev[1]); g.lineTo(p[0], p[1]); g.stroke(); } prev = p; }
+    }
+    // inner core (counter-rotating dots)
+    const cr = 0.55 + Math.sin(t * 3) * 0.03;
+    for (let i = 0; i < CORE.length; i++) { const [x, y, z] = CORE[i], a = -t * 1.6, X = x * Math.cos(a) + z * Math.sin(a), Z = -x * Math.sin(a) + z * Math.cos(a), p = P(X * cr, y * cr * sy, Z * cr); const on = hash(i, Math.floor(t * 6)) > 0.8; g.fillStyle = rgba(on ? C2 : C1, on ? .95 : (p[2] > 0 ? .55 : .2)); g.fillRect(p[0] - 1, p[1] - 1, on ? 2.5 : 1.6, on ? 2.5 : 1.6); }
+
+    // laser band plane
+    if (gr < 1) {
+      const bandPts = []; for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2, rr = Math.sqrt(Math.max(0, 1 - (scanY / sy) ** 2)) * 1.25; bandPts.push(P(Math.cos(a) * rr, -scanY, Math.sin(a) * rr)); }
+      g.fillStyle = rgba(C2, .08 * (1 - gr)); g.strokeStyle = rgba([200, 255, 245], .9 * (1 - gr)); g.lineWidth = 1.5; g.shadowColor = rgba(C2, 1); g.shadowBlur = 16;
+      g.beginPath(); bandPts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.fill(); g.stroke(); g.shadowBlur = 0;
+      const ey = P(0, -scanY, 0)[1];
+      g.strokeStyle = rgba(C2, .4 * (1 - gr)); g.lineWidth = 1; g.setLineDash([2, 6]); g.beginPath(); g.moveTo(CX - R * 2.6, ey); g.lineTo(CX + R * 2.6, ey); g.stroke(); g.setLineDash([]);
+      g.font = '11px "Plex Mono", Consolas, monospace'; g.fillStyle = rgba([207, 239, 255], .8 * (1 - gr)); g.textAlign = 'left';
+      g.fillText(`Y ${(scanY * 100).toFixed(1).padStart(6)}  DEPTH ${(0.9 + hash(Math.floor(t * 20)) * .09).toFixed(3)}`, CX + R * 2.65, ey + 4);
+      g.textAlign = 'right'; g.fillText(`SLICE ${String(Math.floor(t * 37) % 256).padStart(3, '0')}/256`, CX - R * 2.65, ey + 4);
+    }
+
+    drawRing(true);
+
+    // progress gauge arc
+    const GR = R * 1.6;
+    g.lineWidth = 2; g.strokeStyle = rgba(C1, .12); g.beginPath(); g.arc(CX, CY, GR, -Math.PI / 2, Math.PI * 1.5); g.stroke();
+    g.strokeStyle = rgba(C2, .9); g.shadowColor = rgba(C2, 1); g.shadowBlur = 10; g.beginPath(); g.arc(CX, CY, GR, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2); g.stroke(); g.shadowBlur = 0;
+    for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2 - Math.PI / 2, l = i % 6 ? 4 : 9, on = i / 72 < prog; g.strokeStyle = rgba(on ? C2 : C1, on ? .8 : .2); g.lineWidth = 1; g.beginPath(); g.moveTo(CX + Math.cos(a) * (GR + 6), CY + Math.sin(a) * (GR + 6)); g.lineTo(CX + Math.cos(a) * (GR + 6 + l), CY + Math.sin(a) * (GR + 6 + l)); g.stroke(); }
+
+    // side data panels (frameless)
+    g.font = '11px "Plex Mono", Consolas, monospace';
+    const L = [['SUBJECT', t > 2.6 ? NAME : '??????'], ['KPS', `${Math.min(5, Math.floor(prog * 6))}/5`], ['EMBED', `${Math.floor(prog * 512)}/512`], ['COSINE', (prog * 0.9873).toFixed(4)], ['LIVENESS', prog > .7 ? 'PASS' : 'CHECKING'], ['SPOOF', (0.4 - prog * 0.397).toFixed(3)]];
+    L.forEach(([k, v], i) => { const y = CY - 60 + i * 22, a = clamp((t - 0.3 - i * 0.15) / 0.3); g.textAlign = 'left'; g.fillStyle = rgba([95, 115, 135], a); g.fillText(k, W * 0.07, y); g.fillStyle = rgba([207, 239, 255], a); g.fillText(v, W * 0.07 + 90, y); });
+    const hexs = []; for (let i = 0; i < 8; i++) { let s = ''; for (let j = 0; j < 16; j++) s += '0123456789abcdef'[(hash(i + Math.floor(t * 8), j) * 16) | 0]; hexs.push(s); }
+    hexs.forEach((s, i) => { g.textAlign = 'right'; g.fillStyle = rgba(C1, (0.15 + (i === Math.floor(t * 10) % 8 ? .6 : .25))); g.fillText(s, W * 0.93, CY - 70 + i * 20); });
+
+    // big percent / grant
+    g.textAlign = 'center';
+    const ty = H * 0.755 + R * 0.95;
+    if (t < GRANT) {
+      g.font = '600 46px "Plex Mono", Consolas, monospace'; g.fillStyle = rgba([225, 248, 255], 1); g.shadowColor = rgba(C1, .8); g.shadowBlur = 18;
+      g.fillText(String(Math.floor(prog * 100)).padStart(2, '0') + '%', CX, ty - R * 0.95); g.shadowBlur = 0;
+      g.font = '12px "Plex Mono", Consolas, monospace'; g.fillStyle = rgba(C1, .9);
+      const ph = prog < .3 ? 'MAPPING TOPOLOGY' : prog < .6 ? 'EXTRACTING LANDMARKS' : prog < .9 ? 'VERIFYING SIGNATURE' : 'FINALISING';
+      g.fillText(ph.split('').join(' ') + (Math.floor(t * 3) % 2 ? ' _' : '  '), CX, ty - R * 0.95 + 26);
+    } else {
+      const d = t - GRANT;
+      if (d < .5) { g.fillStyle = rgba([200, 255, 225], (1 - d / .5) * .35); g.fillRect(0, 0, W, H); g.strokeStyle = rgba(C1, 1 - d / .5); g.lineWidth = 3; g.beginPath(); g.arc(CX, CY, GR + d * W * .6, 0, Math.PI * 2); g.stroke(); }
+      g.font = `600 ${Math.round(Math.min(W * .055, 64))}px "Plex Mono", Consolas, monospace`; g.fillStyle = rgba([47, 209, 139], clamp(d / .2)); g.shadowColor = 'rgba(47,209,139,.8)'; g.shadowBlur = 24;
+      g.fillText('ACCESS GRANTED', CX, ty - R * 0.95 + 10); g.shadowBlur = 0;
+      g.font = '12px "Plex Mono", Consolas, monospace'; g.fillStyle = rgba([191, 245, 220], clamp((d - .3) / .3));
+      g.fillText(`W E L C O M E   B A C K ,   ${NAME.split('').join(' ')}`, CX, ty - R * 0.95 + 40);
+    }
+    if (FT == null && !RM) requestAnimationFrame(frame);
+  }
+  frame();
+  if (FT != null || RM) document.fonts && document.fonts.ready.then(frame);
+})();
+</script>
+</body>
+</html>

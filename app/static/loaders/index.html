@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaceID · Login loader samples</title>
+<style>
+@font-face { font-family: "Plex Mono"; src: url("../fonts/plexmono-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Plex Mono"; src: url("../fonts/plexmono-600.woff2") format("woff2"); font-weight: 600; }
+html, body { margin: 0; min-height: 100%; background: radial-gradient(900px 520px at 50% 85%, rgba(56,189,248,.08), transparent 70%), #04070b; color: #cfefff;
+  font: 14px/1.6 "Plex Mono", ui-monospace, Consolas, monospace; }
+main { max-width: 980px; margin: 0 auto; padding: 9vh 24px; }
+h1 { margin: 0; font-weight: 600; font-size: 22px; letter-spacing: .3em; background: linear-gradient(90deg, #38bdf8, #2dd4bf); -webkit-background-clip: text; background-clip: text; color: transparent; }
+p.lead { color: #7d8ea3; margin: 8px 0 40px; letter-spacing: .06em; }
+a.item { display: grid; grid-template-columns: 64px 1fr auto; gap: 18px; align-items: baseline; padding: 22px 0; color: inherit; text-decoration: none;
+  border-bottom: 1px solid rgba(56,189,248,.14); transition: padding .2s, color .2s; }
+a.item:hover { padding-left: 10px; color: #fff; }
+a.item:hover .go { color: #2dd4bf; text-shadow: 0 0 12px rgba(45,212,191,.7); }
+.num { color: #38bdf8; font-size: 26px; font-weight: 600; }
+.t { font-weight: 600; letter-spacing: .2em; }
+.d { color: #7d8ea3; font-size: 13px; }
+.go { color: #5f7387; letter-spacing: .2em; font-size: 12px; }
+footer { margin-top: 32px; color: #5f7387; font-size: 12px; letter-spacing: .08em; }
+@media (prefers-reduced-motion: reduce) { a.item { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>LOGIN LOADER · SAMPLES</h1>
+  <p class="lead">Plays after the unlock button is pressed. Each loops; click anywhere on a sample to replay it. Add <code>?name=YOU</code> to change the name.</p>
+  <a class="item" href="loader-1.html"><span class="num">01</span><span><div class="t">TERMINAL BREACH</div><div class="d">Root shell boot log typing at speed, scrolling hex dump, staged progress, RGB glitch blast into ACCESS GRANTED.</div></span><span class="go">PLAY &rarr;</span></a>
+  <a class="item" href="loader-2.html"><span class="num">02</span><span><div class="t">CODE RAIN FACE LOCK</div><div class="d">Cyan code rain; glyphs fall out of the stream to build a 3D face mesh, then the 5 InsightFace landmarks lock on.</div></span><span class="go">PLAY &rarr;</span></a>
+  <a class="item" href="loader-3.html"><span class="num">03</span><span><div class="t">HOLOGRAPHIC SCAN</div><div class="d">Projected wireframe globe with laser slicing band, orbiting data rings, live biometric readouts and a percent gauge.</div></span><span class="go">PLAY &rarr;</span></a>
+  <a class="item" href="loader-4.html"><span class="num">04</span><span><div class="t">DECRYPTION CASCADE</div><div class="d">Radar sweep over a cipher wall that decrypts outward; the name and ACCESS GRANTED scramble into place.</div></span><span class="go">PLAY &rarr;</span></a>
+  <footer>Vanilla HTML/CSS/JS · no dependencies · respects prefers-reduced-motion (shows the final state).</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loader 4 · Decryption Cascade</title>
+<style>
+@font-face { font-family: "Plex Mono"; src: url("../fonts/plexmono-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Plex Mono"; src: url("../fonts/plexmono-600.woff2") format("woff2"); font-weight: 600; }
+:root { --c1:#38bdf8; --c2:#2dd4bf; --ok:#2fd18b; --muted:#5f7387; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #03060a; color: #cfefff; cursor: pointer; user-select: none;
+  font: 14px/1.5 "Plex Mono", ui-monospace, Consolas, monospace; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#center { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; text-align: center; }
+#kicker { font-size: 12px; letter-spacing: .5em; color: var(--c1); text-shadow: 0 0 10px rgba(56,189,248,.6); }
+#name, #access { font-weight: 600; white-space: pre; line-height: 1.05; }
+#name { font-size: clamp(56px, 10vw, 150px); letter-spacing: .12em; margin-top: 10px; }
+#access { font-size: clamp(22px, 3.2vw, 46px); letter-spacing: .32em; margin-top: 18px; }
+.ch { display: inline-block; min-width: .62em; }
+.ch.s { color: rgba(56,189,248,.55); text-shadow: 0 0 8px rgba(56,189,248,.5); }
+.ch.r { color: #eafaff; text-shadow: 0 0 16px rgba(56,189,248,.8), 0 0 40px rgba(45,212,191,.35); }
+.ch.flash { color: #fff; text-shadow: 0 0 20px #fff, 0 0 40px rgba(45,212,191,.9); }
+body.granted .ch.r { color: #2fd18b; text-shadow: 0 0 18px rgba(47,209,139,.85), 0 0 60px rgba(47,209,139,.35); }
+body.granted #kicker { color: #2fd18b; text-shadow: 0 0 10px rgba(47,209,139,.6); }
+.corner { position: fixed; font-size: 12px; letter-spacing: .14em; color: #a9d9ef; white-space: pre; line-height: 1.7; pointer-events: none; }
+.corner b { font-weight: 600; color: #eafaff; }
+.corner .k { color: var(--muted); }
+#bl { left: 4vw; bottom: 7vh; } #br { right: 4vw; bottom: 7vh; text-align: right; }
+#tl { left: 4vw; top: 9vh; } #tr { right: 4vw; top: 9vh; text-align: right; }
+.vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.8)); }
+.tag { position: fixed; left: 18px; top: 14px; font-size: 11px; letter-spacing: .22em; color: var(--muted); z-index: 5; }
+.tag a { color: var(--c1); text-decoration: none; }
+.hint { position: fixed; right: 18px; bottom: 14px; font-size: 11px; letter-spacing: .22em; color: var(--muted); z-index: 5; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="vig"></div>
+<div id="center"><div><div id="kicker">DECRYPTING IDENTITY</div><div id="name"></div><div id="access"></div></div></div>
+<div class="corner" id="tl"></div><div class="corner" id="tr"></div>
+<div class="corner" id="bl"></div><div class="corner" id="br"></div>
+<div class="tag"><a href="index.html">&larr; SAMPLES</a> &nbsp;/&nbsp; 04 · DECRYPTION CASCADE</div>
+<div class="hint">CLICK TO REPLAY</div>
+<script>
+(() => {
+  const Q = new URLSearchParams(location.search);
+  const FT = Q.has('t') ? parseFloat(Q.get('t')) : null;
+  const NAME = (Q.get('name') || 'ALTAIR').toUpperCase().slice(0, 14);
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const GRANT = 3.4, CYCLE = 7;
+  let t0 = performance.now();
+  addEventListener('click', e => { if (!e.target.closest('a')) t0 = performance.now(); });
+  const clock = () => FT != null ? FT : RM ? GRANT + 1.5 : ((performance.now() - t0) / 1000) % CYCLE;
+  const hash = (a, b = 0, c = 0) => { const x = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return x - Math.floor(x); };
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const GL = 'ABCDEF0123456789#$%&@*+=<>/\\|?!ΞΣΔΩ';
+  const glyph = (a, b, c) => GL[(hash(a, b, c) * GL.length) | 0];
+  const HEX = '0123456789ABCDEF';
+
+  const cv = document.getElementById('cv'), g = cv.getContext('2d');
+  let W, H, DPR;
+  function size() { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; g.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  size(); addEventListener('resize', () => { size(); if (FT != null || RM) frame(); });
+
+  const BLIPS = Array.from({ length: 16 }, (_, i) => ({ a: hash(i, 1) * Math.PI * 2, r: 0.25 + hash(i, 2) * 0.7, id: HEX[(hash(i, 3) * 16) | 0] + HEX[(hash(i, 4) * 16) | 0] }));
+
+  function scramble(el, text, tStart, span, t, salt) {
+    let h = '';
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (c === ' ') { h += '<span class="ch"> </span>'; continue; }
+      const rt = tStart + (i / Math.max(1, text.length - 1)) * span + hash(i, salt) * 0.15;
+      if (t < tStart - 0.6) { h += '<span class="ch s" style="opacity:0">' + c + '</span>'; continue; }
+      if (t < rt) h += '<span class="ch s">' + glyph(i, salt, Math.floor(t * 26)) + '</span>';
+      else h += '<span class="ch ' + (t - rt < 0.08 ? 'flash' : 'r') + '">' + c + '</span>';
+    }
+    el.innerHTML = h;
+  }
+
+  const nameEl = document.getElementById('name'), accEl = document.getElementById('access');
+  const tl = document.getElementById('tl'), tr = document.getElementById('tr'), bl = document.getElementById('bl'), br = document.getElementById('br'), kick = document.getElementById('kicker');
+  const hexstr = (n, s, t, res) => { let o = ''; for (let i = 0; i < n; i++) o += (res > i / n) ? HEX[(hash(i, s) * 16) | 0] : HEX[(hash(i, s, Math.floor(t * 20)) * 16) | 0]; return o; };
+
+  function frame() {
+    const t = clock();
+    const gr = t >= GRANT, gd = t - GRANT;
+    document.body.classList.toggle('granted', gr);
+    const C = gr ? '47,209,139' : '56,189,248', C2 = gr ? '127,240,191' : '45,212,191';
+    g.fillStyle = '#03060a'; g.fillRect(0, 0, W, H);
+    const CX = W / 2, CY = H / 2, RR = Math.min(W, H) * 0.46;
+
+    // cipher grid, decrypting radially
+    const cell = 22, maxD = Math.hypot(W, H) / 2;
+    const wave = clamp((t - 0.5) / (GRANT - 0.5)) * maxD * 1.05;
+    g.font = '13px "Plex Mono", Consolas, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let y = cell / 2; y < H; y += cell) for (let x = cell / 2; x < W; x += cell) {
+      const d = Math.hypot(x - CX, y - CY), cx = (x / cell) | 0, cy = (y / cell) | 0;
+      const front = wave - d;
+      if (front > 40) { if (hash(cx, cy) > .93) { g.fillStyle = `rgba(${C},.18)`; g.fillRect(x - 1, y - 1, 2, 2); } continue; }
+      if (front > 0) { g.fillStyle = `rgba(${C2},${0.9 * (1 - front / 40)})`; g.fillText(glyph(cx, cy, 7), x, y); continue; }
+      g.fillStyle = `rgba(${C},${0.07 + hash(cx, cy, Math.floor(t * 3)) * 0.1})`;
+      g.fillText(glyph(cx, cy, Math.floor(t * 10 + hash(cx, cy) * 9)), x, y);
+    }
+
+    // radar
+    g.lineWidth = 1;
+    for (let i = 1; i <= 5; i++) { g.strokeStyle = `rgba(${C},${0.08 + i * 0.03})`; g.beginPath(); g.arc(CX, CY, RR * i / 5, 0, Math.PI * 2); g.stroke(); }
+    g.strokeStyle = `rgba(${C},.12)`; g.beginPath(); g.moveTo(CX - RR, CY); g.lineTo(CX + RR, CY); g.moveTo(CX, CY - RR); g.lineTo(CX, CY + RR); g.stroke();
+    for (let i = 0; i < 120; i++) { const a = i / 120 * Math.PI * 2, l = i % 10 ? 5 : 12; g.strokeStyle = `rgba(${C},${i % 10 ? .25 : .6})`; g.beginPath(); g.moveTo(CX + Math.cos(a) * RR, CY + Math.sin(a) * RR); g.lineTo(CX + Math.cos(a) * (RR + l), CY + Math.sin(a) * (RR + l)); g.stroke(); }
+    const sw = (t * Math.PI * 2 * (gr ? 0.25 : 0.62)) % (Math.PI * 2);
+    if (g.createConicGradient) {
+      const cg = g.createConicGradient(sw - Math.PI * 0.6, CX, CY);
+      cg.addColorStop(0, `rgba(${C2},0)`); cg.addColorStop(0.3, `rgba(${C2},.28)`); cg.addColorStop(0.3001, `rgba(${C2},0)`); cg.addColorStop(1, `rgba(${C2},0)`);
+      g.fillStyle = cg; g.beginPath(); g.arc(CX, CY, RR, 0, Math.PI * 2); g.fill();
+    }
+    g.strokeStyle = `rgba(${C2},.95)`; g.lineWidth = 2; g.shadowColor = `rgba(${C2},1)`; g.shadowBlur = 14;
+    g.beginPath(); g.moveTo(CX, CY); g.lineTo(CX + Math.cos(sw) * RR, CY + Math.sin(sw) * RR); g.stroke(); g.shadowBlur = 0;
+    g.font = '10px "Plex Mono", Consolas, monospace'; g.textAlign = 'left';
+    BLIPS.forEach((b, i) => {
+      if (t < 0.3 + i * 0.08) return;
+      let da = (sw - b.a) % (Math.PI * 2); if (da < 0) da += Math.PI * 2;
+      const a = Math.exp(-da * 0.9), x = CX + Math.cos(b.a) * b.r * RR, y = CY + Math.sin(b.a) * b.r * RR;
+      g.fillStyle = `rgba(${C2},${0.15 + a * 0.85})`; g.beginPath(); g.arc(x, y, 2.5 + a * 2, 0, Math.PI * 2); g.fill();
+      if (a > 0.5) { g.strokeStyle = `rgba(${C2},${(a - .5) * 1.6})`; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 6 + (1 - a) * 30, 0, Math.PI * 2); g.stroke(); }
+      if (i % 3 === 0) { g.fillStyle = `rgba(207,239,255,${0.2 + a * 0.6})`; g.fillText('PKT 0x' + b.id + (t > 0.6 + i * 0.15 ? ' ✓' : ''), x + 9, y - 6); }
+    });
+    // grant shockwave
+    if (gr && gd < 0.9) { const k = gd / 0.9; g.strokeStyle = `rgba(47,209,139,${1 - k})`; g.lineWidth = 3; g.beginPath(); g.arc(CX, CY, RR * (0.2 + k * 1.6), 0, Math.PI * 2); g.stroke(); g.fillStyle = `rgba(190,255,225,${(1 - k) * 0.18})`; g.fillRect(0, 0, W, H); }
+
+    // text
+    kick.textContent = gr ? 'IDENTITY DECRYPTED' : (t < 1 ? 'INTERCEPTING CIPHER STREAM' : 'DECRYPTING IDENTITY');
+    scramble(nameEl, NAME, 0.9, 1.1, t, 1);
+    scramble(accEl, 'ACCESS GRANTED', 2.3, 0.95, t, 2);
+
+    const pk = Math.floor(clamp(t / GRANT) ** 0.8 * 18432), tot = 18432;
+    tl.innerHTML = `<span class="k">CIPHER</span>   <b>AES-256-GCM</b>\n<span class="k">KDF</span>      <b>ARGON2ID · m=64M</b>\n<span class="k">CHANNEL</span>  <b>${gr ? 'SECURE' : 'NEGOTIATING'}</b>`;
+    tr.innerHTML = `<span class="k">SWEEP</span> <b>${String(Math.floor((sw * 180 / Math.PI))).padStart(3, '0')}°</b>\n<span class="k">NODES</span> <b>${Math.min(16, Math.floor(t / 0.08 / 1.2))}/16</b>\n<span class="k">LATENCY</span> <b>${(4 + hash(Math.floor(t * 8)) * 3).toFixed(2)}ms</b>`;
+    bl.innerHTML = `<span class="k">ENCRYPTED PACKETS</span>\n<b style="font-size:26px;letter-spacing:.06em">${pk.toLocaleString('en-US').padStart(6, ' ')}</b> <span class="k">/ ${tot.toLocaleString('en-US')}</span>\n<span class="k">${'▮'.repeat(Math.round(pk / tot * 24))}${'▯'.repeat(24 - Math.round(pk / tot * 24))}</span>`;
+    const res = clamp((t - 0.6) / (GRANT - 0.8));
+    br.innerHTML = `<span class="k">SESSION KEY</span>\n<b>${hexstr(16, 11, t, res)}</b>\n<b>${hexstr(16, 12, t, res - .5 > 0 ? (res - .5) * 2 : 0)}</b>\n<span class="k">${gr ? 'KEY VERIFIED ✓' : 'BRUTE-FORCING ' + Math.floor(res * 100) + '%'}</span>`;
+
+    if (FT == null && !RM) requestAnimationFrame(frame);
+  }
+  frame();
+  if (FT != null || RM) document.fonts && document.fonts.ready.then(frame);
+})();
+</script>
+</body>
+</html>

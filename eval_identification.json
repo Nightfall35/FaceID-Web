@@ -13,59 +13,115 @@
   "closed_set_rank1": 0.9973045822102425,
   "by_threshold": [
     {
-      "threshold": 0.25,
-      "known_correct": 0.9973045822102425,
-      "known_wrong_name": 0.0,
-      "known_rejected": 0.0026954177897574594,
-      "unknown_false_accept": 0.025
-    },
-    {
       "threshold": 0.3,
+      "margin": 0.0,
       "known_correct": 0.9973045822102425,
       "known_wrong_name": 0.0,
-      "known_rejected": 0.0026954177897574594,
+      "known_rejected": 0.0026954177897574125,
       "unknown_false_accept": 0.0033333333333333335
     },
     {
       "threshold": 0.35,
+      "margin": 0.0,
       "known_correct": 0.9973045822102425,
       "known_wrong_name": 0.0,
-      "known_rejected": 0.0026954177897574594,
-      "unknown_false_accept": 0.0
+      "known_rejected": 0.0026954177897574125,
+      "unknown_false_accept": 0.0016666666666666668
     },
     {
       "threshold": 0.4,
+      "margin": 0.0,
       "known_correct": 0.9946091644204852,
       "known_wrong_name": 0.0,
-      "known_rejected": 0.005390835579514808,
+      "known_rejected": 0.005390835579514825,
       "unknown_false_accept": 0.0
     },
     {
       "threshold": 0.45,
+      "margin": 0.0,
       "known_correct": 0.9919137466307277,
       "known_wrong_name": 0.0,
-      "known_rejected": 0.008086253369272267,
+      "known_rejected": 0.008086253369272238,
       "unknown_false_accept": 0.0
     },
     {
       "threshold": 0.5,
-      "known_correct": 0.9919137466307277,
+      "margin": 0.0,
+      "known_correct": 0.9892183288409704,
       "known_wrong_name": 0.0,
-      "known_rejected": 0.008086253369272267,
+      "known_rejected": 0.01078167115902965,
       "unknown_false_accept": 0.0
     },
     {
       "threshold": 0.55,
-      "known_correct": 0.9757412398921833,
+      "margin": 0.0,
+      "known_correct": 0.9703504043126685,
       "known_wrong_name": 0.0,
-      "known_rejected": 0.02425876010781669,
+      "known_rejected": 0.029649595687331536,
       "unknown_false_accept": 0.0
     },
     {
       "threshold": 0.6,
-      "known_correct": 0.9568733153638814,
+      "margin": 0.0,
+      "known_correct": 0.9407008086253369,
       "known_wrong_name": 0.0,
-      "known_rejected": 0.04312668463611857,
+      "known_rejected": 0.05929919137466307,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.3,
+      "margin": 0.05,
+      "known_correct": 0.9973045822102425,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.0026954177897574125,
+      "unknown_false_accept": 0.0033333333333333335
+    },
+    {
+      "threshold": 0.35,
+      "margin": 0.05,
+      "known_correct": 0.9973045822102425,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.0026954177897574125,
+      "unknown_false_accept": 0.0016666666666666668
+    },
+    {
+      "threshold": 0.4,
+      "margin": 0.05,
+      "known_correct": 0.9946091644204852,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.005390835579514825,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.45,
+      "margin": 0.05,
+      "known_correct": 0.9919137466307277,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.008086253369272238,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.5,
+      "margin": 0.05,
+      "known_correct": 0.9892183288409704,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.01078167115902965,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.55,
+      "margin": 0.05,
+      "known_correct": 0.9703504043126685,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.029649595687331536,
+      "unknown_false_accept": 0.0
+    },
+    {
+      "threshold": 0.6,
+      "margin": 0.05,
+      "known_correct": 0.9407008086253369,
+      "known_wrong_name": 0.0,
+      "known_rejected": 0.05929919137466307,
       "unknown_false_accept": 0.0
     }
   ]

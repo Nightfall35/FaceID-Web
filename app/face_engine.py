@@ -160,6 +160,17 @@ def blur_score(crop_bgr: np.ndarray) -> float:
     return float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
 
+def yaw_index(kps: np.ndarray) -> float | None:
+    """|nose offset from eye midpoint| / eye distance: ~0 frontal, >0.45 strongly turned."""
+    k = np.asarray(kps, np.float32)
+    if k.shape != (5, 2):
+        return None
+    eye_d = float(np.linalg.norm(k[1] - k[0]))
+    if eye_d < 1e-3:
+        return None
+    return round(abs(float(k[2][0] - (k[0][0] + k[1][0]) / 2)) / eye_d, 3)
+
+
 class FaceEngine:
     """Thread-safe wrapper: detect -> align -> embed."""
 
@@ -168,13 +179,23 @@ class FaceEngine:
         self.recognizer = ArcFace(os.path.join(model_dir, "w600k_r50.onnx"))
         self._lock = threading.Lock()
 
-    def analyze(self, img_bgr: np.ndarray, det_thresh=0.5, max_faces=64) -> list[Face]:
+    def analyze(self, img_bgr: np.ndarray, det_thresh=0.5, max_faces=64, timings: dict | None = None) -> list[Face]:
+        """If `timings` is given it is filled with per-stage wall times in ms (detect/align/embed)."""
+        import time
+
         with self._lock:
+            t0 = time.perf_counter()
             faces = self.detector.detect(img_bgr, thresh=det_thresh)[:max_faces]
-            if not faces:
-                return []
+            t1 = time.perf_counter()
             crops = [align_face(img_bgr, f.kps) for f in faces]
-            embs = self.recognizer.embed(crops)
+            t2 = time.perf_counter()
+            embs = self.recognizer.embed(crops) if faces else []
+            t3 = time.perf_counter()
+        if timings is not None:
+            timings.update(detect=round((t1 - t0) * 1000, 1), align=round((t2 - t1) * 1000, 1),
+                           embed=round((t3 - t2) * 1000, 1))
+        if not faces:
+            return []
         for f, c, e in zip(faces, crops, embs):
             f.embedding = e.astype(np.float32)
             bw, bh = f.bbox[2] - f.bbox[0], f.bbox[3] - f.bbox[1]
@@ -182,6 +203,7 @@ class FaceEngine:
                 "face_size": int(min(bw, bh)),
                 "blur": round(blur_score(c), 1),
                 "det_score": round(float(f.det_score), 3),
+                "yaw": yaw_index(f.kps),
             }
         return faces
 

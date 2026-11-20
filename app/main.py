@@ -18,11 +18,14 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from .face_engine import FaceEngine, load_image
 from .matcher import DEFAULT_MARGIN, DEFAULT_THRESHOLD, Gallery
 from .storage import Store
+from . import missing
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("FACEID_DATA_DIR", os.path.join(os.path.dirname(BASE), "data"))
 PASSWORD = os.environ.get("FACEID_PASSWORD", "")
 SECRET = os.environ.get("FACEID_SECRET") or secrets.token_hex(32)
+# Display name shown by the login loader after a successful sign-in (cosmetic only; not a credential).
+OPERATOR_NAME = "".join(ch for ch in os.environ.get("FACEID_OPERATOR_NAME", "ALTAIR") if ch.isprintable()).strip()[:40] or "ALTAIR"
 COOKIE = "faceid_session"
 SESSION_MAX_AGE = 7 * 24 * 3600
 MAX_UPLOAD = int(os.environ.get("FACEID_MAX_UPLOAD_MB", "15")) * 1024 * 1024
@@ -64,12 +67,18 @@ def landmark_problems(face) -> list[str]:
 async def lifespan(_app):
     if os.environ.get("FACEID_LAZY_MODELS") != "1":
         engine()  # load ONNX models at startup so the first request is fast
+    try:
+        missing.purge_expired()  # missing-persons data retention (unmatched sightings)
+    except Exception:
+        pass
     yield
 
 
 app = FastAPI(title="FaceID Web", version="1.0.0", lifespan=lifespan)
 _serializer = URLSafeTimedSerializer(SECRET, salt="faceid-auth")
 store = Store(DATA_DIR)
+missing.configure(DATA_DIR, SECRET)  # separate missing_persons.sqlite3; never touches faceid.sqlite3 tables
+app.include_router(missing.router)
 _engine: FaceEngine | None = None
 _gallery: Gallery | None = None
 
@@ -128,7 +137,7 @@ def login_page():
 @app.post("/api/login")
 def login(password: str = Form(...)):
     if not PASSWORD or hmac.compare_digest(password.encode(), PASSWORD.encode()):
-        resp = JSONResponse({"ok": True})
+        resp = JSONResponse({"ok": True, "name": OPERATOR_NAME})
         resp.set_cookie(COOKIE, _serializer.dumps({"t": time.time()}), max_age=SESSION_MAX_AGE,
                         httponly=True, samesite="strict")
         return resp
@@ -148,6 +157,17 @@ def index(request: Request):
     if not is_authed(request):
         return RedirectResponse("/login")
     return FileResponse(os.path.join(BASE, "static", "index.html"))
+
+
+@app.get("/mp", response_class=HTMLResponse)
+def missing_persons_page():
+    # Public page: sighting + self-report forms are open; everything else needs a role login.
+    return FileResponse(os.path.join(BASE, "static", "mp.html"))
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(os.path.join(BASE, "static", "favicon.svg"), media_type="image/svg+xml")
 
 
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
@@ -336,9 +356,12 @@ async def identify(files: List[UploadFile] = File(...), threshold: float | None 
         except (ValueError, HTTPException) as e:
             out.append({"filename": f.filename, "error": getattr(e, "detail", None) or str(e), "faces": []})
             continue
-        faces = engine().analyze(img)
+        stages: dict = {}
+        faces = engine().analyze(img, timings=stages)
+        tm = time.perf_counter()
         matches = g.identify(np.stack([fc.embedding for fc in faces]), threshold=thr, unique=unique,
                                 margin=mrg) if faces else []
+        stages["match"] = round((time.perf_counter() - tm) * 1000, 1)
         out.append({
             "filename": f.filename,
             "width": img.shape[1], "height": img.shape[0],
@@ -346,6 +369,7 @@ async def identify(files: List[UploadFile] = File(...), threshold: float | None 
             "faces": sorted(({**fc.to_dict(), **m.to_dict()} for fc, m in zip(faces, matches)),
                             key=lambda d: d["bbox"][0]),
             "ms": int((time.time() - t0) * 1000),
+            "stages": stages,  # per-stage ms: detect / align / embed / match
         })
     return {"threshold": thr, "margin": mrg, "enrolled_people": len(g), "results": out}
 

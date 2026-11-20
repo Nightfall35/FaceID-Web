@@ -1,0 +1,27 @@
+/* FaceID login — "Holographic Scan" loading overlay shown after a successful sign-in.
+ * Self-contained; palette cyan #38bdf8 -> teal #2dd4bf, green #2fd18b for granted. */
+.fll-overlay {
+  position: fixed; inset: 0; z-index: 1000; overflow: hidden; cursor: pointer;
+  background: radial-gradient(900px 600px at 50% 80%, rgba(56,189,248,.08), transparent 70%), #04070b;
+  font: 14px/1.5 "IBM Plex Mono", ui-monospace, Consolas, "SFMono-Regular", Menlo, monospace;
+  color: #cfefff; user-select: none;
+  opacity: 0; transition: opacity .25s ease;
+}
+.fll-overlay.is-on { opacity: 1; }
+.fll-overlay canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.fll-overlay::before { /* scanlines */
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,.025) 0 1px, transparent 1px 3px);
+}
+.fll-overlay::after { /* vignette */
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.7));
+}
+.fll-hint {
+  position: absolute; right: 18px; bottom: 14px; z-index: 2;
+  font-size: 11px; letter-spacing: .22em; color: #5f7387; text-transform: uppercase;
+}
+.fll-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .fll-overlay { transition: none; }
+}

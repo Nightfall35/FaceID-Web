@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaceID</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">◉</span> FaceID</div>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-view="identify">Identify</button>
+    <button class="tab" data-view="enroll">Enroll</button>
+    <button class="tab" data-view="settings">Settings</button>
+  </nav>
+  <button class="btn ghost small" id="logout" hidden>Sign out</button>
+</header>
+
+<main>
+  <!-- IDENTIFY -->
+  <section class="view" id="view-identify">
+    <div class="view-head">
+      <div>
+        <h1>Identify faces</h1>
+        <p class="muted">Upload photos. Every face is detected and matched only against people you've enrolled.</p>
+      </div>
+      <div class="threshold-box">
+        <label for="thr">Match threshold <b id="thr-val">0.40</b></label>
+        <input type="range" id="thr" min="0.2" max="0.7" step="0.01" value="0.40">
+        <div class="hint"><span>more matches</span><span>stricter</span></div>
+      </div>
+    </div>
+    <label class="dropzone" id="id-drop">
+      <input type="file" id="id-files" accept="image/*" multiple hidden>
+      <div class="dz-icon">⤒</div>
+      <div><b>Drop photos here</b> or click to choose</div>
+      <div class="muted small">JPG, PNG, WebP · multiple files OK</div>
+    </label>
+    <div id="id-status" class="status"></div>
+    <div id="id-results"></div>
+  </section>
+
+  <!-- ENROLL -->
+  <section class="view" id="view-enroll" hidden>
+    <div class="view-head">
+      <div>
+        <h1>Enrolled people</h1>
+        <p class="muted">Only enroll people who have agreed to it. 3–5 clear photos per person (different angles and lighting) gives the best accuracy.</p>
+      </div>
+      <form id="new-person" class="inline-form">
+        <input name="name" placeholder="New person's name" required maxlength="100">
+        <button class="btn primary">Add person</button>
+      </form>
+    </div>
+    <div id="people" class="people-grid"></div>
+    <div id="people-empty" class="empty" hidden>No one enrolled yet. Add a person above, then upload their photos.</div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="view-settings" hidden>
+    <h1>Settings</h1>
+    <div class="card settings-card">
+      <h2>Recognition threshold</h2>
+      <p class="muted">Cosine-similarity score a face needs to be labeled as an enrolled person. Lower = more matches but more risk of false matches; higher = stricter. Default <b id="def-thr">0.40</b>.</p>
+      <div class="row">
+        <input type="range" id="thr2" min="0.2" max="0.7" step="0.01">
+        <b id="thr2-val"></b>
+        <button class="btn" id="save-thr">Save as default</button>
+        <button class="btn ghost" id="reset-thr">Reset</button>
+      </div>
+    </div>
+    <div class="card settings-card">
+      <h2>Stats</h2>
+      <p id="stats" class="muted"></p>
+    </div>
+    <div class="card settings-card danger">
+      <h2>Delete all data</h2>
+      <p class="muted">Permanently removes every enrolled person, their photos and face embeddings, and settings. This cannot be undone.</p>
+      <div class="row">
+        <input id="wipe-confirm" placeholder="Type DELETE to confirm">
+        <button class="btn danger" id="wipe">Delete everything</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<template id="person-tpl">
+  <article class="card person">
+    <div class="person-head">
+      <div class="avatar"></div>
+      <div class="pmeta"><h3 class="pname"></h3><span class="muted small pcount"></span></div>
+      <button class="icon-btn del-person" title="Delete person">🗑</button>
+    </div>
+    <div class="thumbs"></div>
+    <label class="upload-btn">
+      <input type="file" accept="image/*" multiple hidden>
+      <span>＋ Add photos</span>
+    </label>
+    <label class="small muted force"><input type="checkbox" class="force-cb"> force (skip "doesn't look like" check)</label>
+    <div class="enroll-log"></div>
+  </article>
+</template>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaceID · Sign in</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login-body">
+  <form class="card login-card" id="login">
+    <div class="brand big"><span class="logo">◉</span> FaceID</div>
+    <p class="muted">Private face recognition for people you've enrolled.</p>
+    <label>Password<input type="password" name="password" autofocus required autocomplete="current-password"></label>
+    <button class="btn primary" type="submit">Sign in</button>
+    <p class="error" id="err"></p>
+  </form>
+<script>
+document.getElementById('login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const r = await fetch('/api/login', {method: 'POST', body: new FormData(e.target)});
+  if (r.ok) location.href = '/'; else document.getElementById('err').textContent = 'Wrong password';
+});
+</script>
+</body>
+</html>
